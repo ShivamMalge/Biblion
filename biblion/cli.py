@@ -221,9 +221,12 @@ def cmd_init(args) -> int:
         print(f"Wrote {sample}")
 
     print("\nNext:")
-    print("  1. biblion prompt > PROMPT.md    # give this to your AI")
-    print("  2. put its markdown in modules/")
-    print("  3. biblion build")
+    print("  1. Write chapters as modules/01_*.md, modules/02_*.md, ...")
+    print("     or let an AI write them:")
+    print("       biblion skill --install   # Claude Code")
+    print("       biblion prompt            # any other assistant")
+    print("  2. biblion build")
+    print("  3. biblion doctor             # if diagrams do not render")
     return 0
 
 
