@@ -68,7 +68,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             libpango-1.0-0 libpangoft2-1.0-0 \
-            libjpeg-dev libopenjp2-7-dev libffi-dev
+            libjpeg-dev libopenjp2-7-dev libffi-dev \
+            librsvg2-bin
 
       - name: System libraries for WeasyPrint (macOS)
         if: runner.os == 'macOS'
@@ -79,7 +80,7 @@ jobs:
           HOMEBREW_NO_AUTO_UPDATE: "1"
           HOMEBREW_NO_INSTALL_CLEANUP: "1"
         run: |
-          brew install pango libffi
+          brew install pango libffi librsvg
           echo "DYLD_FALLBACK_LIBRARY_PATH=$(brew --prefix)/lib" >> "$GITHUB_ENV"
 
       - name: Install mermaid-cli

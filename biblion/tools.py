@@ -205,6 +205,10 @@ def browser_svg_to_png(browser: Path, svg_path: Path, png_path: Path,
         "--no-first-run", "--no-default-browser-check", "--disable-extensions",
         "--disable-background-networking", "--disable-sync",
         "--disable-default-apps", "--disable-dev-shm-usage", "--mute-audio",
+        # Without a virtual time budget, headless Chrome can wait forever for
+        # the page to go "idle" and never take the shot. Our SVGs are static
+        # and self-contained, so a short budget is always enough.
+        "--virtual-time-budget=5000",
         f"--user-data-dir={profile_dir}",
         f"--force-device-scale-factor={scale}",
         f"--window-size={width},{height}",

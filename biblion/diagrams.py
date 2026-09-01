@@ -17,6 +17,7 @@ Design notes, because two of these were real bugs in the first version:
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 import struct
 import subprocess
@@ -55,6 +56,10 @@ D2_BLOCK_RE = re.compile(r"```d2[ \t]*\n(.*?)\n```", re.DOTALL)
 # Rendered wide, then scaled down by CSS into a ~16cm column. 1400px across
 # roughly 16.6cm works out to ~215dpi in the PDF, which stays crisp in print.
 DEFAULT_WIDTH = 1400
+
+# Per-renderer wall-clock ceiling. Generous enough for a big diagram, short
+# enough that a stuck renderer surfaces as an error rather than a hung build.
+RENDER_TIMEOUT = int(os.environ.get("BIBLION_RENDER_TIMEOUT", "120"))
 
 # The usable figure box on an A4 page with this theme's margins, in CSS px
 # at 96dpi: 16.6cm of column width by 21cm of height.
@@ -185,7 +190,7 @@ class DiagramRenderer:
         self.progress(f"  rendering mermaid diagram {key[:8]} ...")
         started = time.monotonic()
         if not self._mermaid_to_png(code, png_path, key):
-            self.progress(f"  mermaid {key[:8]} FAILED")
+            self.progress(f"  mermaid {key[:8]} FAILED: {self._last_error()}")
             return None
 
         self._autofit(code, png_path, key, "mermaid",
@@ -220,7 +225,7 @@ class DiagramRenderer:
         self.progress(f"  rendering d2 diagram {key[:8]} ...")
         started = time.monotonic()
         if not self._d2_to_png(code, png_path, key):
-            self.progress(f"  d2 {key[:8]} FAILED")
+            self.progress(f"  d2 {key[:8]} FAILED: {self._last_error()}")
             return None
 
         self._autofit(code, png_path, key, "d2", _d2_downward, self._d2_to_png)
@@ -240,31 +245,47 @@ class DiagramRenderer:
                          svg_path, "d2", key):
             return False
 
+        # Rasterisers in order of preference. Each is tried until one works,
+        # rather than giving up on the first -- a browser that cannot screenshot
+        # on this machine should not take d2 support down with it.
+        #
         # 1. A browser we already found. Best fidelity (d2 embeds its fonts as
         #    base64 @font-face, which rsvg does not always honour) and no
         #    install cost, since mermaid needs the same browser anyway.
-        if self.browser is not None:
-            png_path.unlink(missing_ok=True)
-            ok, detail = tools.browser_svg_to_png(
-                self.browser, svg_path, png_path, target_width=self.width)
-            if not ok:
-                self.report.failed.append((f"d2:{key}", detail))
-            return ok
-
         # 2. rsvg-convert, if the user happens to have it.
-        if self.rsvg is not None:
-            return self._run(
-                [str(self.rsvg), "-o", str(png_path), "-w", str(self.width),
-                 "--background-color=white", str(svg_path)], png_path, "d2", key)
+        # 3. d2 rasterising itself, which needs its own Chromium (~150MB)
+        #    behind an interactive prompt, so only with consent.
+        attempts: list[tuple[str, object]] = []
 
-        # 3. Last resort: d2 rasterises itself, which means downloading its own
-        #    Chromium (~150MB) behind an interactive prompt. Only with consent.
-        stdin_text = "y\n" if self.allow_downloads else "n\n"
-        return self._run([str(self.d2), "--theme", str(self.theme),
-                          "--pad", str(self.pad), str(d2_path), str(png_path)],
-                         png_path, "d2", key, stdin_text=stdin_text)
+        if self.browser is not None:
+            attempts.append(("browser", lambda: tools.browser_svg_to_png(
+                self.browser, svg_path, png_path, target_width=self.width)))
+
+        if self.rsvg is not None:
+            attempts.append(("rsvg-convert", lambda: self._run_quiet(
+                [str(self.rsvg), "-o", str(png_path), "-w", str(self.width),
+                 "--background-color=white", str(svg_path)], png_path)))
+
+        attempts.append(("d2 native", lambda: self._run_quiet(
+            [str(self.d2), "--theme", str(self.theme), "--pad", str(self.pad),
+             str(d2_path), str(png_path)], png_path,
+            stdin_text="y\n" if self.allow_downloads else "n\n")))
+
+        errors = []
+        for name, attempt in attempts:
+            ok, detail = attempt()
+            if ok:
+                return True
+            errors.append(f"{name}: {detail}")
+            self.progress(f"    {name} could not rasterise d2 {key[:8]}: {detail}")
+
+        self.report.failed.append((f"d2:{key}", " | ".join(errors)[:400]))
+        return False
 
     # -- shared -----------------------------------------------------------
+
+    def _last_error(self) -> str:
+        return self.report.failed[-1][1] if self.report.failed else "unknown error"
 
     def _autofit(self, code: str, png_path: Path, key: str, kind: str,
                  rewrite, render) -> None:
@@ -295,27 +316,37 @@ class DiagramRenderer:
         else:
             alt_path.unlink(missing_ok=True)
 
-    def _run(self, cmd: list[str], expected: Path, kind: str, key: str,
-             stdin_text: str | None = None) -> bool:
+    def _run_quiet(self, cmd: list[str], expected: Path,
+                   stdin_text: str | None = None) -> tuple[bool, str]:
         """Run a renderer and verify it genuinely produced the file.
 
-        Deletes any pre-existing target first so a stale artefact from an
-        earlier run can never be mistaken for a successful render.
+        Returns (ok, detail) without recording anything, so a caller trying
+        several rasterisers can fall through to the next one. Deletes any
+        pre-existing target first, so a stale artefact from an earlier run can
+        never be mistaken for a successful render.
         """
         expected.unlink(missing_ok=True)
         try:
             result = subprocess.run(cmd, capture_output=True, text=True,
-                                    input=stdin_text, timeout=300)
-        except Exception as exc:  # noqa: BLE001 - surfaced in the report
-            self.report.failed.append((f"{kind}:{key}", f"{type(exc).__name__}: {exc}"))
-            return False
+                                    input=stdin_text, timeout=RENDER_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            return False, f"timed out after {RENDER_TIMEOUT}s"
+        except Exception as exc:  # noqa: BLE001 - surfaced to the caller
+            return False, f"{type(exc).__name__}: {exc}"
 
         if result.returncode != 0 or not expected.is_file() or expected.stat().st_size == 0:
             detail = (result.stderr or result.stdout or "").strip()
             last_line = detail.splitlines()[-1] if detail else "no output"
-            self.report.failed.append((f"{kind}:{key}", _explain(detail, last_line)))
-            return False
-        return True
+            return False, _explain(detail, last_line)
+        return True, ""
+
+    def _run(self, cmd: list[str], expected: Path, kind: str, key: str,
+             stdin_text: str | None = None) -> bool:
+        """_run_quiet, but a failure is recorded in the report."""
+        ok, detail = self._run_quiet(cmd, expected, stdin_text)
+        if not ok:
+            self.report.failed.append((f"{kind}:{key}", detail))
+        return ok
 
     # -- markdown substitution -------------------------------------------
 
