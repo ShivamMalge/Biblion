@@ -76,13 +76,22 @@ jobs:
       - name: Install mermaid-cli
         run: npm install -g @mermaid-js/mermaid-cli
 
-      - name: Install d2
-        # Into a user-local prefix so the install needs no sudo, with a
-        # privileged install as the fallback if the script lacks --prefix.
+      - name: Install d2 (Linux)
+        if: runner.os == 'Linux'
+        # A user-local prefix so the install needs no sudo.
         run: |
-          curl -fsSL https://d2lang.com/install.sh | sh -s -- --prefix "$HOME/.local" \
-            || curl -fsSL https://d2lang.com/install.sh | sudo sh -s --
+          curl -fsSL https://d2lang.com/install.sh | sh -s -- --prefix "$HOME/.local"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install d2 (macOS)
+        if: runner.os == 'macOS'
+        # Homebrew ships a d2 bottle. The upstream install script ignores
+        # --prefix here and shells out to brew anyway, then dies on a broken
+        # pipe writing to stdout -- so go to brew directly.
+        run: brew install d2
+
+      - name: Verify d2 is on PATH
+        run: d2 --version
 
       - name: Install Biblion
         run: |
