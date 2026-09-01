@@ -60,7 +60,7 @@ jobs:
     # anything reaches PyPI. Configure it under Settings -> Environments.
     environment:
       name: pypi
-      url: https://pypi.org/p/biblion
+      url: https://pypi.org/p/biblion-pdf
     permissions:
       # Required for PyPI Trusted Publishing. No API token is stored anywhere:
       # PyPI verifies this workflow's OIDC identity instead.

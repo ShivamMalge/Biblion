@@ -4,9 +4,9 @@ Turn plain markdown into a typeset PDF book — with real rendered diagrams —
 locally, and for free on every run.
 
 <p align="center">
-  <img src="docs/images/cover.png" width="32%" alt="Cover page">
-  <img src="docs/images/page-with-figure.png" width="32%" alt="A page with a rendered figure and caption">
-  <img src="docs/images/d2-containment.png" width="32%" alt="A d2 architecture diagram">
+  <img src="https://raw.githubusercontent.com/ShivamMalge/Biblion/main/docs/images/cover.png" width="32%" alt="Cover page">
+  <img src="https://raw.githubusercontent.com/ShivamMalge/Biblion/main/docs/images/page-with-figure.png" width="32%" alt="A page with a rendered figure and caption">
+  <img src="https://raw.githubusercontent.com/ShivamMalge/Biblion/main/docs/images/d2-containment.png" width="32%" alt="A d2 architecture diagram">
 </p>
 
 <p align="center"><em>Every page above was produced from plain markdown by
@@ -37,8 +37,8 @@ page-break rules, and diagram rendering. Change the theme and rebuild; you
 never pay tokens again.
 
 <p align="center">
-  <img src="docs/images/contents.png" width="45%" alt="Contents page with page numbers">
-  <img src="docs/images/figures.png" width="45%" alt="List of figures">
+  <img src="https://raw.githubusercontent.com/ShivamMalge/Biblion/main/docs/images/contents.png" width="45%" alt="Contents page with page numbers">
+  <img src="https://raw.githubusercontent.com/ShivamMalge/Biblion/main/docs/images/figures.png" width="45%" alt="List of figures">
 </p>
 
 <p align="center"><em>Contents and Figures pages, both with real page numbers.
@@ -47,7 +47,15 @@ Neither is written by hand.</em></p>
 ## Install
 
 ```bash
-pip install -e .
+pip install biblion-pdf
+```
+
+The distribution is `biblion-pdf`; the command and the import are both
+`biblion`. (The bare name on PyPI belongs to an unrelated Django app.)
+To work on Biblion itself:
+
+```bash
+pip install -e ".[dev]"
 ```
 
 Then check what your machine can render:

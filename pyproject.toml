@@ -3,7 +3,10 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "biblion"
+# The PyPI distribution name. The bare "biblion" is held by an unrelated
+# Django blog app last released in 2015. Only this string changes -- the
+# import package, the CLI command and everything else stay "biblion".
+name = "biblion-pdf"
 version = "0.2.0"
 description = "Turn plain markdown into a typeset PDF book, with real diagrams, locally and for free."
 readme = "README.md"
