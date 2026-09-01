@@ -61,6 +61,8 @@ when no browser exists.
 biblion init my-book      # scaffold book.toml + modules/
 biblion prompt            # print the markdown contract to give your AI
 biblion build             # render the PDF
+biblion doctor            # check which renderers are available
+biblion skill --install   # teach Claude Code to use Biblion
 ```
 
 `biblion build` reads `book.toml` from the project folder, so a rebuild is one
@@ -78,6 +80,22 @@ output = "output/Containers.pdf"
 toc_depth = 3
 strict    = false     # true = fail the build if any diagram fails to render
 ```
+
+## Use with an AI agent
+
+This is the whole point of the tool, so it ships as a first-class path.
+
+```bash
+biblion skill --install            # into ~/.claude/skills/biblion/
+biblion skill --install --project . # or into this repo only
+```
+
+That installs a Claude Code skill telling the agent to write content-only
+markdown and shell out to `biblion build`, instead of hand-building a PDF.
+The agent spends its tokens on what to say; Biblion does the rest.
+
+For any other assistant, `biblion prompt` prints the same contract as plain
+text to paste into a chat.
 
 ## The markdown contract
 
@@ -132,6 +150,17 @@ width. Turn it off with `--no-autofit`.
 - `--allow-downloads` is only needed on a machine with no browser at all,
   where d2 has to fetch its own Chromium.
 
+## Supported platforms
+
+CI runs the unit tests on Linux, macOS and Windows, and builds
+`examples/diagram-tour` end to end with `--strict` on Linux and macOS — so a
+broken diagram renderer fails the build rather than shipping a book full of
+red boxes.
+
+The example book is not built on Windows in CI because WeasyPrint there needs
+the GTK3 runtime, which has no clean unattended installer. Windows is the
+platform Biblion is developed on, so it gets covered by hand.
+
 ## Layout
 
 ```
@@ -143,4 +172,5 @@ biblion/
   tools.py             finding binaries and a browser
   themes/textbook.css  the stylesheet that does the actual work
   authoring_prompt.md  the contract `biblion prompt` prints
+  skill/SKILL.md       the Claude Code skill `biblion skill` installs
 ```

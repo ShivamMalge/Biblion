@@ -13,25 +13,25 @@ diagram *source* costs about thirty tokens and produces a real figure.
 ```d2
 direction: right
 
-ai: "AI writes markdown" {
-  shape: rectangle
+paid: "Paid once, in tokens" {
+  ai: "AI writes\nmarkdown"
+  md: "modules/*.md" {
+    shape: page
+  }
+  ai -> md
 }
 
-md: "modules/*.md\n(plain text)" {
-  shape: page
+free: "Free, on every run" {
+  biblion: "biblion build" {
+    shape: hexagon
+  }
+  pdf: "Typeset PDF" {
+    shape: document
+  }
+  biblion -> pdf
 }
 
-biblion: "biblion build" {
-  shape: hexagon
-}
-
-pdf: "Typeset PDF" {
-  shape: document
-}
-
-ai -> md: "paid once, in tokens"
-md -> biblion: "free, local"
-biblion -> pdf: "repeatable"
+paid.md -> free.biblion
 ```
 
 !!! deepdive "The division of labour"

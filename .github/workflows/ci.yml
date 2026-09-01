@@ -1,0 +1,113 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  # Unit tests run everywhere. They deliberately avoid importing weasyprint
+  # (the CLI imports it lazily), so they need no system libraries at all.
+  test:
+    name: tests (${{ matrix.os }}, py${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Unit tests
+        run: python -m pytest tests/ -q
+
+  # The real integration test: render the example book with every diagram
+  # renderer wired up, and fail if a single diagram does not come out.
+  #
+  # Linux and macOS only for now. WeasyPrint on Windows needs the GTK3 runtime,
+  # which has no clean unattended installer -- and Windows is the platform
+  # Biblion is developed on, so it is the least likely to regress unnoticed.
+  build-book:
+    name: build example book (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: System libraries for WeasyPrint (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libpango-1.0-0 libpangoft2-1.0-0 \
+            libjpeg-dev libopenjp2-7-dev libffi-dev
+
+      - name: System libraries for WeasyPrint (macOS)
+        if: runner.os == 'macOS'
+        run: brew install pango libffi
+
+      - name: Install mermaid-cli
+        run: npm install -g @mermaid-js/mermaid-cli
+
+      - name: Install d2
+        run: curl -fsSL https://d2lang.com/install.sh | sh -s --
+
+      - name: Install Biblion
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Show what was detected
+        run: biblion doctor
+
+      - name: Build the example book
+        # --strict turns any unrendered diagram into a failed build, which is
+        # the whole point of running this in CI.
+        run: biblion build examples/diagram-tour --strict
+
+      - name: Check the PDF is real
+        shell: bash
+        run: |
+          pdf=examples/diagram-tour/output/DiagramTour.pdf
+          test -f "$pdf" || { echo "no PDF produced"; exit 1; }
+          python - <<'PY'
+          import fitz
+          doc = fitz.open("examples/diagram-tour/output/DiagramTour.pdf")
+          pages = doc.page_count
+          images = sum(len(doc[i].get_images()) for i in range(pages))
+          unrendered = [i for i in range(pages) if "Unrendered" in doc[i].get_text()]
+          print(f"pages={pages} embedded_images={images} unrendered={unrendered}")
+          assert pages >= 4, f"suspiciously short book: {pages} pages"
+          assert images >= 5, f"expected the diagrams to be embedded, got {images}"
+          assert not unrendered, f"pages with unrendered diagrams: {unrendered}"
+          PY
+
+      - name: Upload the PDF
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: DiagramTour-${{ matrix.os }}.pdf
+          path: examples/diagram-tour/output/DiagramTour.pdf
+          if-no-files-found: warn

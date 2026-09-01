@@ -11,6 +11,16 @@ import pytest
 from biblion import config, diagrams, document, tools
 
 
+@pytest.fixture(autouse=True)
+def _clear_tool_caches():
+    """Tool discovery is lru_cached, so a faked result would leak between tests."""
+    tools.find_binary.cache_clear()
+    tools.find_browser.cache_clear()
+    yield
+    tools.find_binary.cache_clear()
+    tools.find_browser.cache_clear()
+
+
 # --- binary discovery ------------------------------------------------------
 
 def test_find_binary_sees_a_local_binary(tmp_path, monkeypatch):
@@ -36,6 +46,67 @@ def test_find_binary_returns_absolute_paths(tmp_path, monkeypatch):
 def test_find_binary_missing_returns_none(tmp_path):
     tools.find_binary.cache_clear()
     assert tools.find_binary("definitely-not-a-real-binary", (str(tmp_path),)) is None
+
+
+# --- browser discovery -----------------------------------------------------
+#
+# Biblion is developed on Windows, so the Linux and macOS branches would
+# otherwise be exercised for the first time in CI. These simulate each
+# platform by faking platform.system() and which files exist.
+
+def _fake_platform(monkeypatch, system: str, existing: str | None):
+    monkeypatch.delenv("BIBLION_BROWSER", raising=False)
+    monkeypatch.setattr(tools.platform, "system", lambda: system)
+    # as_posix() so the comparison works no matter which OS runs the test:
+    # Path("/usr/bin/x") stringifies with backslashes on Windows.
+    monkeypatch.setattr(Path, "is_file",
+                        lambda self: self.as_posix() == existing)
+    monkeypatch.setattr(tools.shutil, "which", lambda name: None)
+    tools.find_browser.cache_clear()
+
+
+def test_finds_chrome_on_linux(monkeypatch):
+    _fake_platform(monkeypatch, "Linux", "/usr/bin/google-chrome")
+    found = tools.find_browser()
+    assert found is not None and found.as_posix() == "/usr/bin/google-chrome"
+
+
+def test_finds_chrome_on_macos(monkeypatch):
+    path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+    _fake_platform(monkeypatch, "Darwin", path)
+    found = tools.find_browser()
+    assert found is not None and found.as_posix() == path
+
+
+def test_finds_edge_on_windows(monkeypatch):
+    path = "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
+    _fake_platform(monkeypatch, "Windows", path)
+    found = tools.find_browser()
+    assert found is not None and found.as_posix() == path
+
+
+def test_no_browser_returns_none(monkeypatch):
+    _fake_platform(monkeypatch, "Linux", None)
+    assert tools.find_browser() is None
+
+
+# --- browser rasteriser ----------------------------------------------------
+
+def test_rasteriser_rejects_an_svg_with_no_dimensions(tmp_path):
+    svg = tmp_path / "bad.svg"
+    svg.write_text("not really an svg", encoding="utf-8")
+    ok, detail = tools.browser_svg_to_png(
+        Path("no-such-browser"), svg, tmp_path / "out.png")
+    assert not ok and "dimensions" in detail
+
+
+def test_rasteriser_reports_a_missing_browser(tmp_path):
+    svg = tmp_path / "ok.svg"
+    svg.write_text('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"/>',
+                   encoding="utf-8")
+    ok, detail = tools.browser_svg_to_png(
+        Path("definitely-not-a-browser"), svg, tmp_path / "out.png")
+    assert not ok and detail
 
 
 # --- fit heuristic ---------------------------------------------------------
@@ -203,3 +274,23 @@ def test_resolve_fills_in_output_and_title(tmp_path):
     assert resolved.title == "Modules"
     assert resolved.output.endswith(".pdf")
     assert resolved.cache_dir
+
+
+# --- packaging -------------------------------------------------------------
+
+def test_repo_skill_matches_the_packaged_one():
+    """The repo's .claude copy and the packaged copy must not drift apart."""
+    root = Path(__file__).resolve().parent.parent
+    packaged = root / "biblion" / "skill" / "SKILL.md"
+    in_repo = root / ".claude" / "skills" / "biblion" / "SKILL.md"
+    if not in_repo.is_file():          # a wheel install has only the packaged one
+        pytest.skip("repo checkout not present")
+    assert packaged.read_text(encoding="utf-8") == in_repo.read_text(encoding="utf-8")
+
+
+def test_packaged_skill_has_frontmatter():
+    root = Path(__file__).resolve().parent.parent
+    text = (root / "biblion" / "skill" / "SKILL.md").read_text(encoding="utf-8")
+    assert text.startswith("---\n")
+    assert "\nname: biblion\n" in text
+    assert "\ndescription: " in text

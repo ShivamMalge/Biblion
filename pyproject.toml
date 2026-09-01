@@ -12,11 +12,16 @@ license = { text = "MIT" }
 authors = [{ name = "Shivam" }]
 keywords = ["markdown", "pdf", "book", "mermaid", "d2", "weasyprint", "typesetting"]
 classifiers = [
+    "Development Status :: 4 - Beta",
     "Environment :: Console",
     "Intended Audience :: End Users/Desktop",
     "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Text Processing :: Markup :: Markdown",
+    "Topic :: Printing",
 ]
 
 dependencies = [
@@ -32,13 +37,14 @@ dev = ["pytest>=8", "pymupdf>=1.24"]
 biblion = "biblion.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/shivam/biblion"
+Homepage = "https://github.com/ShivamMalge/Biblion"
+Issues = "https://github.com/ShivamMalge/Biblion/issues"
 
 [tool.setuptools]
 packages = ["biblion"]
 
 [tool.setuptools.package-data]
-biblion = ["themes/*.css", "authoring_prompt.md"]
+biblion = ["themes/*.css", "authoring_prompt.md", "skill/SKILL.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

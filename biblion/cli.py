@@ -225,6 +225,36 @@ def cmd_prompt(args) -> int:
 
 
 # ---------------------------------------------------------------------------
+# skill
+# ---------------------------------------------------------------------------
+
+def cmd_skill(args) -> int:
+    """Print or install the Claude Code skill that teaches an agent to use Biblion."""
+    source = PACKAGE_DIR / "skill" / "SKILL.md"
+    if not source.is_file():
+        raise SystemExit(f"Packaged skill is missing: {source}")
+
+    if not args.install:
+        sys.stdout.write(source.read_text(encoding="utf-8"))
+        return 0
+
+    if args.project:
+        target_dir = Path(args.project).resolve() / ".claude" / "skills" / "biblion"
+    else:
+        target_dir = Path.home() / ".claude" / "skills" / "biblion"
+
+    target = target_dir / "SKILL.md"
+    if target.exists() and not args.force:
+        raise SystemExit(f"{target} already exists (use --force to overwrite)")
+
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+    print(f"Installed skill: {target}")
+    print("\nClaude Code will now reach for Biblion when asked for a PDF or book.")
+    return 0
+
+
+# ---------------------------------------------------------------------------
 
 def _add_build_flags(parser: argparse.ArgumentParser) -> None:
     """Build options.
@@ -288,6 +318,16 @@ def build_parser() -> argparse.ArgumentParser:
     p_prompt = sub.add_parser(
         "prompt", help="Print the markdown contract to hand to an AI")
     p_prompt.set_defaults(func=cmd_prompt)
+
+    p_skill = sub.add_parser(
+        "skill", help="Print or install the Claude Code skill for Biblion")
+    p_skill.add_argument("--install", action="store_true",
+                         help="Write the skill into ~/.claude/skills/biblion/")
+    p_skill.add_argument("--project",
+                         help="Install into <project>/.claude/skills/ instead of "
+                              "the user-level skills directory")
+    p_skill.add_argument("--force", action="store_true")
+    p_skill.set_defaults(func=cmd_skill)
 
     return parser
 
