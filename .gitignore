@@ -1,0 +1,24 @@
+# Third-party binaries — install locally instead (see README)
+d2.exe
+d2
+mmdc.cmd
+node_modules/
+
+# Generated output — these are build artifacts, not source
+output/
+sample_course/output/
+**/modules_pdf/
+**/_diagram_cache/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Local puppeteer config (contains your machine's browser path)
+puppeteer-config.json
+
+# OS cruft
+.DS_Store
+Thumbs.db
