@@ -44,12 +44,16 @@ You need:
 |---|---|---|
 | **weasyprint** | the PDF itself | `pip install weasyprint` (Windows also needs the GTK3 runtime) |
 | **mermaid-cli** | ` ```mermaid ` blocks | `npm install -g @mermaid-js/mermaid-cli` |
-| a Chromium browser | driving mermaid-cli | you almost certainly already have Chrome or Edge |
+| a Chromium browser | rasterising both kinds of diagram | you almost certainly already have Chrome or Edge |
 | **d2** *(optional)* | ` ```d2 ` blocks | [d2lang.com](https://d2lang.com/tour/install), or drop `d2`/`d2.exe` in the project folder |
 
 Biblion finds a browser you already have (Edge on Windows, Chrome elsewhere)
-and points mermaid-cli at it, so puppeteer never downloads its own copy. Set
-`BIBLION_BROWSER` to override.
+and uses it for both renderers: it points mermaid-cli at it, and it
+screenshots d2's SVG output with it. So neither puppeteer nor d2 ever
+downloads its own ~150MB Chromium. Set `BIBLION_BROWSER` to override.
+
+`rsvg-convert` is no longer required for d2 and is only used as a fallback
+when no browser exists.
 
 ## Use
 
@@ -113,6 +117,8 @@ width. Turn it off with `--no-autofit`.
 
 ## Notes
 
+- `examples/diagram-tour/` is a worked example exercising both renderers;
+  build it with `biblion build examples/diagram-tour`.
 - Diagrams are cached on a hash of their source, so only changed diagrams
   re-render. The first build of a large book is slow; later ones are not.
 - `--per-module` also writes one PDF per source file, titled from each file's
@@ -120,8 +126,11 @@ width. Turn it off with `--no-autofit`.
 - `--strict` exits non-zero if any diagram failed, which is what you want in
   CI. By default a failed diagram becomes a visibly-marked red box rather
   than silently looking like an ordinary code block.
-- `d2` needs a one-time Chromium download to export PNG. Pass
-  `--allow-downloads` to accept it, or install `rsvg-convert` to skip it.
+- d2 is rasterised by screenshotting its SVG in headless Chrome/Edge, which
+  handles d2's nested `<svg>` and base64 `@font-face` correctly. WeasyPrint
+  and cairosvg both render that SVG wrong, so neither is used for it.
+- `--allow-downloads` is only needed on a machine with no browser at all,
+  where d2 has to fetch its own Chromium.
 
 ## Layout
 

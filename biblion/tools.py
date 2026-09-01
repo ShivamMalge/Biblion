@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import os
 import platform
+import re
 import shutil
 import subprocess
 from dataclasses import dataclass
@@ -281,9 +282,9 @@ def survey(project_dirs: tuple[str, ...] = ()) -> list[ToolStatus]:
                    "```d2 diagrams",
                    "https://d2lang.com/tour/install (or drop d2/d2.exe in your project root)"),
         ToolStatus("browser", browser, None,
-                   "rendering mermaid without downloading Chrome",
+                   "rasterising mermaid and d2 diagrams",
                    "install Chrome/Edge, or set BIBLION_BROWSER=/path/to/chrome"),
         ToolStatus("rsvg-convert", rsvg, _version_of(rsvg, ["--version"]),
-                   "d2 diagrams (optional: avoids d2's one-time Chromium download)",
+                   "d2 diagrams (optional: only used when no browser is found)",
                    "Linux: apt install librsvg2-bin | macOS: brew install librsvg"),
     ]

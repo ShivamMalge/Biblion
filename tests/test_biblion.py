@@ -61,6 +61,45 @@ def test_direction_rewrite_leaves_td_alone():
     assert diagrams.MERMAID_DIRECTION_RE.sub(r"\1TD", source, count=1) == source
 
 
+# --- d2 ---------------------------------------------------------------------
+
+def test_d2_direction_is_turned_downward():
+    source = "direction: right\n\na -> b: build\n"
+    assert "direction: down" in diagrams._d2_downward(source)
+
+
+def test_d2_sequence_diagrams_are_left_alone():
+    """Sequence diagrams already read top-to-bottom; reshaping is wasted work."""
+    source = "shape: sequence_diagram\ndirection: right\na -> b\n"
+    assert diagrams._d2_downward(source) == source
+
+
+def test_d2_nested_direction_is_not_rewritten():
+    """Only a top-level declaration counts, not one inside a container."""
+    source = "cluster: {\n  direction: right\n  a -> b\n}\n"
+    assert diagrams._d2_downward(source) == source
+
+
+def test_svg_dimensions_from_viewbox(tmp_path):
+    svg = tmp_path / "a.svg"
+    svg.write_text('<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" '
+                   'viewBox="0 0 296 455"><rect/></svg>', encoding="utf-8")
+    assert tools.svg_dimensions(svg) == (296, 455)
+
+
+def test_svg_dimensions_from_width_height(tmp_path):
+    svg = tmp_path / "b.svg"
+    svg.write_text('<svg xmlns="http://www.w3.org/2000/svg" '
+                   'width="120" height="60"></svg>', encoding="utf-8")
+    assert tools.svg_dimensions(svg) == (120, 60)
+
+
+def test_svg_dimensions_gives_up_cleanly(tmp_path):
+    svg = tmp_path / "c.svg"
+    svg.write_text("not an svg at all", encoding="utf-8")
+    assert tools.svg_dimensions(svg) is None
+
+
 # --- diagram fallback ------------------------------------------------------
 
 class _NoToolRenderer(diagrams.DiagramRenderer):

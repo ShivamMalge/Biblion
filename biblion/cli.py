@@ -136,22 +136,29 @@ def cmd_doctor(args) -> int:
             print(f"         needed for: {status.required_for}")
             print(f"         install:    {status.install_hint}")
 
-    mermaid_ok = statuses[0].ok
-    d2_ok = statuses[1].ok
-    rsvg_ok = statuses[3].ok
+    by_name = {status.name: status for status in statuses}
+    mermaid_ok = by_name["mmdc"].ok
+    d2_ok = by_name["d2"].ok
+    rsvg_ok = by_name["rsvg-convert"].ok
+    browser_ok = by_name["browser"].ok
 
     print()
-    if mermaid_ok:
+    if mermaid_ok and browser_ok:
         print("  ```mermaid blocks will render.")
+    elif mermaid_ok:
+        print("  ```mermaid blocks will render if mermaid-cli has its own Chrome.")
     else:
-        print("  ```mermaid blocks will NOT render.")
-    if d2_ok and rsvg_ok:
+        print("  ```mermaid blocks will NOT render  (install mermaid-cli).")
+
+    if d2_ok and browser_ok:
+        print("  ```d2 blocks will render (rasterised by your browser).")
+    elif d2_ok and rsvg_ok:
         print("  ```d2 blocks will render via rsvg-convert.")
     elif d2_ok:
-        print("  ```d2 blocks need a one-time Chromium download by d2;")
-        print("  run `biblion build --allow-downloads` once to accept it.")
+        print("  ```d2 blocks need a browser to rasterise. Install Chrome/Edge,")
+        print("  or run `biblion build --allow-downloads` to let d2 fetch its own.")
     else:
-        print("  ```d2 blocks will NOT render.")
+        print("  ```d2 blocks will NOT render  (install d2).")
     return 0
 
 

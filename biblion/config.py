@@ -107,8 +107,16 @@ class BookConfig:
             slug = "_".join(slug.split()) or "book"
             self.output = str(base / "output" / f"{slug}.pdf")
 
+        # Anchor a relative output path to the project folder, not the cwd.
+        # Otherwise `biblion build examples/foo` writes foo's diagram cache
+        # into the *parent* project's output directory.
+        output_path = Path(self.output)
+        if not output_path.is_absolute():
+            output_path = base / output_path
+        self.output = str(output_path.resolve())
+
         if not self.cache_dir:
-            self.cache_dir = str(Path(self.output).resolve().parent / "_diagram_cache")
+            self.cache_dir = str(output_path.resolve().parent / "_diagram_cache")
 
         return self
 

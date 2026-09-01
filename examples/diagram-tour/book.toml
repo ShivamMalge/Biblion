@@ -1,0 +1,9 @@
+title    = "Diagrams in Biblion"
+subtitle = "A worked example of the mermaid and d2 pipelines"
+eyebrow  = "BIBLION EXAMPLE"
+
+input  = "modules"
+output = "output/DiagramTour.pdf"
+
+toc_depth = 3
+strict    = true

@@ -74,6 +74,23 @@ FULL_BLEED_ABOVE_ASPECT = 2.6
 MERMAID_DIRECTION_RE = re.compile(
     r"^([ \t]*(?:flowchart|graph)[ \t]+)(LR|RL)\b", re.MULTILINE)
 
+# d2's equivalent: a top-level `direction: right`. Only a declaration at the
+# start of a line counts, so a nested container's own direction is left alone.
+D2_DIRECTION_RE = re.compile(
+    r"^(direction[ \t]*:[ \t]*)(right|left)[ \t]*$", re.MULTILINE)
+
+# d2 sequence diagrams read top-to-bottom by definition; rewriting their
+# direction does nothing useful and only costs a second render.
+D2_SEQUENCE_RE = re.compile(r"^[ \t]*shape[ \t]*:[ \t]*sequence_diagram",
+                            re.MULTILINE)
+
+
+def _d2_downward(code: str) -> str:
+    """Turn a horizontal d2 diagram vertical, where that makes sense."""
+    if D2_SEQUENCE_RE.search(code):
+        return code
+    return D2_DIRECTION_RE.sub(r"\1down", code, count=1)
+
 
 @dataclass
 class DiagramReport:
@@ -115,7 +132,8 @@ class DiagramRenderer:
     def __init__(self, cache_dir: Path, project_dirs: tuple[str, ...] = (),
                  puppeteer_config: str | None = None, theme: str = "0",
                  width: int = DEFAULT_WIDTH, background: str = "white",
-                 allow_downloads: bool = False, autofit: bool = True):
+                 allow_downloads: bool = False, autofit: bool = True,
+                 pad: int = 20):
         # Resolved so rendered images can be referenced as absolute file://
         # URIs regardless of what the caller passed in.
         self.cache_dir = Path(cache_dir).resolve()
@@ -125,11 +143,15 @@ class DiagramRenderer:
         self.background = background
         self.allow_downloads = allow_downloads
         self.autofit = autofit
+        # d2 defaults to 100px of padding, which is a lot of dead space
+        # once the figure is scaled into a text column.
+        self.pad = pad
         self.report = DiagramReport()
 
         self.mmdc = tools.find_binary("mmdc", project_dirs)
         self.d2 = tools.find_binary("d2", project_dirs)
         self.rsvg = tools.find_binary("rsvg-convert", project_dirs)
+        self.browser = tools.find_browser()
         self.puppeteer_config = tools.puppeteer_config(puppeteer_config)
 
     # -- cache ------------------------------------------------------------
@@ -138,7 +160,8 @@ class DiagramRenderer:
         material = "\x00".join([
             renderer, code, str(self.width), str(self.theme), self.background,
             # Bust the cache when the renderer binary itself changes.
-            str(self.mmdc or ""), str(self.d2 or ""),
+            str(self.mmdc or ""), str(self.d2 or ""), str(self.pad),
+            str(self.browser or ""),
         ])
         return hashlib.sha256(material.encode("utf-8")).hexdigest()[:16]
 
@@ -158,23 +181,9 @@ class DiagramRenderer:
         if not self._mermaid_to_png(code, png_path, key):
             return None
 
-        # Auto-fit: a long left-to-right chain becomes an unreadable strip in a
-        # portrait column. Re-render it top-to-bottom and keep whichever version
-        # ends up with physically larger text on the page.
-        if self.autofit:
-            width, height = png_size(png_path)
-            if width / max(height, 1) > RESHAPE_ABOVE_ASPECT:
-                reshaped = MERMAID_DIRECTION_RE.sub(r"\1TD", code, count=1)
-                if reshaped != code:
-                    alt_path = self.cache_dir / f"mermaid_{key}_td.png"
-                    if self._mermaid_to_png(reshaped, alt_path, key + ":td"):
-                        if fit_scale(*png_size(alt_path)) > fit_scale(width, height):
-                            png_path.unlink(missing_ok=True)
-                            alt_path.replace(png_path)
-                            self.report.reshaped += 1
-                        else:
-                            alt_path.unlink(missing_ok=True)
-
+        self._autofit(code, png_path, key, "mermaid",
+                      lambda src: MERMAID_DIRECTION_RE.sub(r"\1TD", src, count=1),
+                      self._mermaid_to_png)
         self.report.rendered += 1
         return png_path
 
@@ -200,38 +209,79 @@ class DiagramRenderer:
             self.report.cached += 1
             return png_path
 
-        d2_path = self.cache_dir / f"d2_{key}.d2"
-        d2_path.write_text(code, encoding="utf-8")
-
-        if self.rsvg is not None:
-            # Preferred when available: no browser involved at all.
-            svg_path = self.cache_dir / f"d2_{key}.svg"
-            svg_path.unlink(missing_ok=True)
-            compiled = self._run(
-                [str(self.d2), "--theme", str(self.theme), str(d2_path), str(svg_path)],
-                svg_path, "d2", key)
-            if compiled and self._run(
-                    [str(self.rsvg), "-o", str(png_path), "-w", str(self.width),
-                     "--background-color=white", str(svg_path)],
-                    png_path, "d2", key):
-                self.report.rendered += 1
-                return png_path
+        if not self._d2_to_png(code, png_path, key):
             return None
 
-        # No rsvg: let d2 rasterise itself. d2 needs its own Chromium for any
-        # non-SVG export and will interactively prompt to download ~150MB the
-        # first time. We answer that prompt only when the user has opted in;
-        # otherwise we decline and report an actionable message, rather than
-        # hanging on stdin or quietly emitting a code block.
+        self._autofit(code, png_path, key, "d2", _d2_downward, self._d2_to_png)
+        self.report.rendered += 1
+        return png_path
+
+    def _d2_to_png(self, code: str, png_path: Path, key: str) -> bool:
+        d2_path = png_path.with_suffix(".d2")
+        d2_path.write_text(code, encoding="utf-8")
+
+        # d2 always compiles to SVG without needing a browser; the only
+        # question is who rasterises it.
+        svg_path = png_path.with_suffix(".svg")
+        if not self._run([str(self.d2), "--theme", str(self.theme),
+                          "--pad", str(self.pad), str(d2_path), str(svg_path)],
+                         svg_path, "d2", key):
+            return False
+
+        # 1. A browser we already found. Best fidelity (d2 embeds its fonts as
+        #    base64 @font-face, which rsvg does not always honour) and no
+        #    install cost, since mermaid needs the same browser anyway.
+        if self.browser is not None:
+            png_path.unlink(missing_ok=True)
+            ok, detail = tools.browser_svg_to_png(
+                self.browser, svg_path, png_path, target_width=self.width)
+            if not ok:
+                self.report.failed.append((f"d2:{key}", detail))
+            return ok
+
+        # 2. rsvg-convert, if the user happens to have it.
+        if self.rsvg is not None:
+            return self._run(
+                [str(self.rsvg), "-o", str(png_path), "-w", str(self.width),
+                 "--background-color=white", str(svg_path)], png_path, "d2", key)
+
+        # 3. Last resort: d2 rasterises itself, which means downloading its own
+        #    Chromium (~150MB) behind an interactive prompt. Only with consent.
         stdin_text = "y\n" if self.allow_downloads else "n\n"
-        if self._run([str(self.d2), "--theme", str(self.theme),
-                      str(d2_path), str(png_path)], png_path, "d2", key,
-                     stdin_text=stdin_text):
-            self.report.rendered += 1
-            return png_path
-        return None
+        return self._run([str(self.d2), "--theme", str(self.theme),
+                          "--pad", str(self.pad), str(d2_path), str(png_path)],
+                         png_path, "d2", key, stdin_text=stdin_text)
 
     # -- shared -----------------------------------------------------------
+
+    def _autofit(self, code: str, png_path: Path, key: str, kind: str,
+                 rewrite, render) -> None:
+        """Re-render a too-wide figure the other way round, and keep the better.
+
+        A long left-to-right chain becomes an unreadable strip in a portrait
+        column. Direction is presentation, and the authoring contract tells
+        writers not to spend tokens on presentation -- so Biblion decides it.
+        """
+        if not self.autofit:
+            return
+        width, height = png_size(png_path)
+        if width / max(height, 1) <= RESHAPE_ABOVE_ASPECT:
+            return
+
+        reshaped = rewrite(code)
+        if reshaped == code:
+            return
+
+        alt_path = png_path.with_name(png_path.stem + "_alt.png")
+        if not render(reshaped, alt_path, key + ":alt"):
+            return
+
+        if fit_scale(*png_size(alt_path)) > fit_scale(width, height):
+            png_path.unlink(missing_ok=True)
+            alt_path.replace(png_path)
+            self.report.reshaped += 1
+        else:
+            alt_path.unlink(missing_ok=True)
 
     def _run(self, cmd: list[str], expected: Path, kind: str, key: str,
              stdin_text: str | None = None) -> bool:

@@ -66,25 +66,43 @@ flowchart LR
 ````
 
 Use ```d2 for architecture diagrams, containers and grouped systems, where
-d2's nesting reads better than mermaid's:
+d2's nesting reads better than mermaid's `subgraph`:
 
 ````
 ```d2
-cluster: Kubernetes cluster {
+cluster: "Kubernetes cluster" {
   pod: Pod
   svc: Service
   pod -> svc
 }
+client: Client { shape: person }
 client -> cluster.svc: request
 ```
 ````
 
+d2 also does sequence diagrams, which suit protocol walkthroughs:
+
+````
+```d2
+shape: sequence_diagram
+client -> gateway: "POST /orders"
+gateway -> service: "forward"
+service -> client: "201 Created"
+```
+````
+
+Useful d2 shapes: `person`, `cylinder` (datastores), `page`, `document`,
+`hexagon`, `queue`. Use them sparingly, where they carry meaning.
+
 Diagram rules:
 
 - Always quote node labels that contain spaces or punctuation: `A["Like this"]`.
-- Use `<br/>` inside mermaid labels for line breaks. It is the one HTML tag allowed.
+- Use `<br/>` inside mermaid labels for line breaks. It is the one HTML tag
+  allowed. In d2 labels, use `\n`.
 - Keep a diagram to roughly 12 nodes. Two clear diagrams beat one crowded one.
 - Do not set colours or styles in the diagram source; the theme handles it.
+- Do not worry about direction or which way a diagram flows. Biblion re-lays
+  out anything too wide for the page, so pick whichever reads naturally.
 
 ## What you are optimising for
 
