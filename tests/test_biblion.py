@@ -60,13 +60,21 @@ def test_find_binary_missing_returns_none(tmp_path):
 # otherwise be exercised for the first time in CI. These simulate each
 # platform by faking platform.system() and which files exist.
 
+def _norm(path) -> str:
+    """Compare paths the same way whichever OS runs the test.
+
+    Path.as_posix() is not enough: it only rewrites separators on Windows, so
+    a Windows candidate path keeps its backslashes when parsed as a PosixPath
+    on Linux, and a POSIX candidate keeps its forward slashes on Windows.
+    """
+    return str(path).replace("\\", "/")
+
+
 def _fake_platform(monkeypatch, system: str, existing: str | None):
     monkeypatch.delenv("BIBLION_BROWSER", raising=False)
     monkeypatch.setattr(tools.platform, "system", lambda: system)
-    # as_posix() so the comparison works no matter which OS runs the test:
-    # Path("/usr/bin/x") stringifies with backslashes on Windows.
     monkeypatch.setattr(Path, "is_file",
-                        lambda self: self.as_posix() == existing)
+                        lambda self: _norm(self) == existing)
     monkeypatch.setattr(tools.shutil, "which", lambda name: None)
     tools.find_browser.cache_clear()
 
@@ -74,21 +82,21 @@ def _fake_platform(monkeypatch, system: str, existing: str | None):
 def test_finds_chrome_on_linux(monkeypatch):
     _fake_platform(monkeypatch, "Linux", "/usr/bin/google-chrome")
     found = tools.find_browser()
-    assert found is not None and found.as_posix() == "/usr/bin/google-chrome"
+    assert found is not None and _norm(found) == "/usr/bin/google-chrome"
 
 
 def test_finds_chrome_on_macos(monkeypatch):
     path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
     _fake_platform(monkeypatch, "Darwin", path)
     found = tools.find_browser()
-    assert found is not None and found.as_posix() == path
+    assert found is not None and _norm(found) == path
 
 
 def test_finds_edge_on_windows(monkeypatch):
     path = "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
     _fake_platform(monkeypatch, "Windows", path)
     found = tools.find_browser()
-    assert found is not None and found.as_posix() == path
+    assert found is not None and _norm(found) == path
 
 
 def test_no_browser_returns_none(monkeypatch):
