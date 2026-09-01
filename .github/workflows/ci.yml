@@ -66,7 +66,12 @@ jobs:
 
       - name: System libraries for WeasyPrint (macOS)
         if: runner.os == 'macOS'
-        run: brew install pango libffi
+        # Homebrew puts libgobject/libpango under its own prefix, which
+        # ctypes.util.find_library does not search -- so WeasyPrint imports
+        # fine and then fails to dlopen at runtime. Point the loader at it.
+        run: |
+          brew install pango libffi
+          echo "DYLD_FALLBACK_LIBRARY_PATH=$(brew --prefix)/lib" >> "$GITHUB_ENV"
 
       - name: Install mermaid-cli
         run: npm install -g @mermaid-js/mermaid-cli

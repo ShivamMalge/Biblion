@@ -42,10 +42,23 @@ You need:
 
 | Tool | For | Install |
 |---|---|---|
-| **weasyprint** | the PDF itself | `pip install weasyprint` (Windows also needs the GTK3 runtime) |
+| **weasyprint** | the PDF itself | `pip install weasyprint` — see the platform note below |
 | **mermaid-cli** | ` ```mermaid ` blocks | `npm install -g @mermaid-js/mermaid-cli` |
 | a Chromium browser | rasterising both kinds of diagram | you almost certainly already have Chrome or Edge |
 | **d2** *(optional)* | ` ```d2 ` blocks | [d2lang.com](https://d2lang.com/tour/install), or drop `d2`/`d2.exe` in the project folder |
+
+**WeasyPrint's system libraries.** The pip package is not enough on its own;
+it needs Pango at runtime.
+
+- **Linux:** `sudo apt install libpango-1.0-0 libpangoft2-1.0-0 libffi-dev`
+- **macOS:** `brew install pango libffi`, then add
+  `export DYLD_FALLBACK_LIBRARY_PATH="$(brew --prefix)/lib"` to your shell
+  profile. Homebrew installs the libraries under its own prefix, which
+  Python's loader does not search, so without this WeasyPrint imports fine and
+  then fails with `cannot load library 'libgobject-2.0-0'`.
+- **Windows:** install the GTK3 runtime.
+
+`biblion doctor` detects this and prints the fix for your platform.
 
 Biblion finds a browser you already have (Edge on Windows, Chrome elsewhere)
 and uses it for both renderers: it points mermaid-cli at it, and it

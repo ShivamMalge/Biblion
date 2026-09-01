@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from biblion import config, diagrams, document, tools
+from biblion import cli, config, diagrams, document, tools
 
 
 @pytest.fixture(autouse=True)
@@ -308,3 +308,21 @@ def test_packaged_skill_has_frontmatter():
     assert text.startswith("---\n")
     assert "\nname: biblion\n" in text
     assert "\ndescription: " in text
+
+
+# --- weasyprint diagnostics -------------------------------------------------
+
+def test_macos_dylib_failure_suggests_the_loader_path(monkeypatch):
+    """The macOS failure is a loader-path problem, not a missing pip package."""
+    monkeypatch.setattr(cli.platform, "system", lambda: "Darwin")
+    hint = "\n".join(cli._weasyprint_hint(
+        "cannot load library 'libgobject-2.0-0': dlopen(...)"))
+    assert "DYLD_FALLBACK_LIBRARY_PATH" in hint
+    assert "brew install pango" in hint
+
+
+def test_linux_hint_names_the_apt_packages(monkeypatch):
+    monkeypatch.setattr(cli.platform, "system", lambda: "Linux")
+    hint = "\n".join(cli._weasyprint_hint("cannot load library 'libgobject-2.0-0'"))
+    assert "libpango" in hint
+    assert "DYLD" not in hint

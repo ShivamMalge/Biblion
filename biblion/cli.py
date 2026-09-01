@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import platform
 import sys
 from pathlib import Path
 
@@ -115,6 +116,33 @@ def cmd_build(args) -> int:
 # doctor
 # ---------------------------------------------------------------------------
 
+def _weasyprint_hint(error: str) -> list[str]:
+    """Turn a WeasyPrint import failure into the fix for this platform.
+
+    The usual failure is not a missing pip package but a missing (or
+    unfindable) Pango/GObject shared library, and the fix differs per OS.
+    """
+    system = platform.system()
+    missing_lib = "libgobject" in error or "cannot load library" in error
+
+    if system == "Darwin":
+        if missing_lib:
+            return [
+                "Homebrew's libraries are not on the loader path. Run:",
+                "  brew install pango libffi",
+                '  export DYLD_FALLBACK_LIBRARY_PATH="$(brew --prefix)/lib"',
+                "Add that export to your shell profile to make it stick.",
+            ]
+        return ["brew install pango libffi, then pip install weasyprint"]
+
+    if system == "Linux":
+        return ["sudo apt install libpango-1.0-0 libpangoft2-1.0-0 libffi-dev",
+                "(or the equivalent for your distribution)"]
+
+    return ["pip install weasyprint",
+            "On Windows this also needs the GTK3 runtime installed."]
+
+
 def cmd_doctor(args) -> int:
     base = Path(args.project or ".").resolve()
     print(f"Biblion {__version__}\n")
@@ -124,7 +152,8 @@ def cmd_doctor(args) -> int:
         print(f"  [ok]   weasyprint      {weasyprint.__version__}")
     except Exception as exc:  # noqa: BLE001
         print(f"  [FAIL] weasyprint      {exc}")
-        print("         pip install weasyprint  (Windows also needs the GTK3 runtime)")
+        for line in _weasyprint_hint(str(exc)):
+            print(f"         {line}")
 
     statuses = tools.survey((str(base), str(Path.cwd())))
     for status in statuses:
