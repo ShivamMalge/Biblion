@@ -43,6 +43,10 @@ jobs:
     name: build example book (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
+    env:
+      # Without this Python buffers stdout when it is not a TTY, so a stalled
+      # build shows an empty log and you cannot tell where it stopped.
+      PYTHONUNBUFFERED: "1"
     strategy:
       fail-fast: false
       matrix:

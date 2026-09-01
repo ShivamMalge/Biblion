@@ -14,6 +14,7 @@ import platform
 import re
 import shutil
 import subprocess
+import tempfile
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -166,8 +167,12 @@ def svg_dimensions(svg_path: Path) -> tuple[int, int] | None:
     return None
 
 
+BROWSER_TIMEOUT = int(os.environ.get("BIBLION_BROWSER_TIMEOUT", "90"))
+
+
 def browser_svg_to_png(browser: Path, svg_path: Path, png_path: Path,
-                       target_width: int = 1400, max_scale: int = 4) -> tuple[bool, str]:
+                       target_width: int = 1400, max_scale: int = 4,
+                       timeout: int = BROWSER_TIMEOUT) -> tuple[bool, str]:
     """Rasterise an SVG by screenshotting it in headless Chrome/Edge.
 
     This is how Biblion renders d2 without rsvg-convert (which has no sane
@@ -185,15 +190,21 @@ def browser_svg_to_png(browser: Path, svg_path: Path, png_path: Path,
     # blow up a tiny diagram to absurd pixel dimensions.
     scale = max(1, min(max_scale, round(target_width / max(width, 1))))
 
-    # A private profile dir: without it, headless refuses to start (or silently
-    # attaches) when the user already has Edge or Chrome open.
-    profile_dir = CACHE_DIR / "browser-profile"
-    profile_dir.mkdir(parents=True, exist_ok=True)
+    # A throwaway profile per invocation. Sharing one directory means Chrome
+    # writes a SingletonLock into it, and a previous run that did not exit
+    # cleanly leaves that lock behind -- the next launch then blocks on it
+    # forever instead of failing. A fresh directory cannot collide.
+    profile_dir = Path(tempfile.mkdtemp(prefix="biblion-browser-"))
 
     png_path.unlink(missing_ok=True)
     cmd = [
-        str(browser), "--headless=new", "--disable-gpu", "--no-sandbox",
-        "--hide-scrollbars", "--disable-extensions",
+        str(browser), "--headless=new",
+        "--disable-gpu", "--no-sandbox", "--hide-scrollbars",
+        # Keep a CI or first-run browser from waiting on anything interactive
+        # or network-bound. None of this is needed to draw a local SVG.
+        "--no-first-run", "--no-default-browser-check", "--disable-extensions",
+        "--disable-background-networking", "--disable-sync",
+        "--disable-default-apps", "--disable-dev-shm-usage", "--mute-audio",
         f"--user-data-dir={profile_dir}",
         f"--force-device-scale-factor={scale}",
         f"--window-size={width},{height}",
@@ -201,9 +212,17 @@ def browser_svg_to_png(browser: Path, svg_path: Path, png_path: Path,
         svg_path.as_uri(),
     ]
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+        result = subprocess.run(cmd, capture_output=True, text=True,
+                                timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return False, (
+            f"browser timed out after {timeout}s rendering {svg_path.name}. "
+            f"Set BIBLION_BROWSER_TIMEOUT to raise the limit, or "
+            f"BIBLION_BROWSER to point at a different browser.")
     except Exception as exc:  # noqa: BLE001
         return False, f"{type(exc).__name__}: {exc}"
+    finally:
+        shutil.rmtree(profile_dir, ignore_errors=True)
 
     if png_path.is_file() and png_path.stat().st_size > 0:
         return True, ""

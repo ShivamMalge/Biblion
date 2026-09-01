@@ -62,12 +62,13 @@ def cmd_build(args) -> int:
         background=config.diagram_background,
         allow_downloads=config.allow_downloads,
         autofit=config.autofit,
+        progress=lambda message: print(message, flush=True),
     )
 
-    print(f"Biblion {__version__}")
+    print(f"Biblion {__version__}", flush=True)
     print(f"  input   {input_dir}  ({len(module_files)} file(s))")
     print(f"  theme   {stylesheet.name}")
-    print(f"  output  {out_path}")
+    print(f"  output  {out_path}", flush=True)
 
     sources = [(f, f.read_text(encoding="utf-8")) for f in module_files]
 

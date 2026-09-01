@@ -20,6 +20,7 @@ import hashlib
 import re
 import struct
 import subprocess
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -133,7 +134,7 @@ class DiagramRenderer:
                  puppeteer_config: str | None = None, theme: str = "0",
                  width: int = DEFAULT_WIDTH, background: str = "white",
                  allow_downloads: bool = False, autofit: bool = True,
-                 pad: int = 20):
+                 pad: int = 20, progress=None):
         # Resolved so rendered images can be referenced as absolute file://
         # URIs regardless of what the caller passed in.
         self.cache_dir = Path(cache_dir).resolve()
@@ -146,6 +147,9 @@ class DiagramRenderer:
         # d2 defaults to 100px of padding, which is a lot of dead space
         # once the figure is scaled into a text column.
         self.pad = pad
+        # Called with a one-line status per diagram. Rendering is slow and
+        # silent otherwise, which makes a stall indistinguishable from work.
+        self.progress = progress or (lambda message: None)
         self.report = DiagramReport()
 
         self.mmdc = tools.find_binary("mmdc", project_dirs)
@@ -178,12 +182,16 @@ class DiagramRenderer:
             self.report.cached += 1
             return png_path
 
+        self.progress(f"  rendering mermaid diagram {key[:8]} ...")
+        started = time.monotonic()
         if not self._mermaid_to_png(code, png_path, key):
+            self.progress(f"  mermaid {key[:8]} FAILED")
             return None
 
         self._autofit(code, png_path, key, "mermaid",
                       lambda src: MERMAID_DIRECTION_RE.sub(r"\1TD", src, count=1),
                       self._mermaid_to_png)
+        self.progress(f"  mermaid {key[:8]} done in {time.monotonic() - started:.1f}s")
         self.report.rendered += 1
         return png_path
 
@@ -209,10 +217,14 @@ class DiagramRenderer:
             self.report.cached += 1
             return png_path
 
+        self.progress(f"  rendering d2 diagram {key[:8]} ...")
+        started = time.monotonic()
         if not self._d2_to_png(code, png_path, key):
+            self.progress(f"  d2 {key[:8]} FAILED")
             return None
 
         self._autofit(code, png_path, key, "d2", _d2_downward, self._d2_to_png)
+        self.progress(f"  d2 {key[:8]} done in {time.monotonic() - started:.1f}s")
         self.report.rendered += 1
         return png_path
 
