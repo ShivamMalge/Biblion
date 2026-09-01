@@ -12,6 +12,7 @@ jobs:
   test:
     name: tests (${{ matrix.os }}, py${{ matrix.python }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -41,6 +42,7 @@ jobs:
   build-book:
     name: build example book (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -69,11 +71,21 @@ jobs:
         # Homebrew puts libgobject/libpango under its own prefix, which
         # ctypes.util.find_library does not search -- so WeasyPrint imports
         # fine and then fails to dlopen at runtime. Point the loader at it.
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+          HOMEBREW_NO_INSTALL_CLEANUP: "1"
         run: |
           brew install pango libffi
           echo "DYLD_FALLBACK_LIBRARY_PATH=$(brew --prefix)/lib" >> "$GITHUB_ENV"
 
       - name: Install mermaid-cli
+        # Skip puppeteer's private Chromium download (~150MB). Biblion points
+        # mermaid-cli at the browser already on the machine, so the bundled
+        # copy is dead weight -- and not downloading it is the same claim the
+        # tool makes to its users, so CI should be proving it works.
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: "true"
+          PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "true"
         run: npm install -g @mermaid-js/mermaid-cli
 
       - name: Install d2 (Linux)
@@ -88,6 +100,9 @@ jobs:
         # Homebrew ships a d2 bottle. The upstream install script ignores
         # --prefix here and shells out to brew anyway, then dies on a broken
         # pipe writing to stdout -- so go to brew directly.
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+          HOMEBREW_NO_INSTALL_CLEANUP: "1"
         run: brew install d2
 
       - name: Verify d2 is on PATH
