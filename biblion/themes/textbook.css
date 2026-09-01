@@ -89,12 +89,16 @@ body {
 .toc li a {
     text-decoration: none;
     color: #1c1c1c;
-    display: flex;
-    justify-content: space-between;
+    /* Block + float, not flex: WeasyPrint drops the flex layout here and the
+       page number ends up jammed inside a wrapping title. A float puts the
+       number at the top right and lets long titles wrap under it. */
+    display: block;
 }
-.toc li a::after {
+.toc li a::before {
     content: target-counter(attr(href), page);
+    float: right;
     color: #6b6b6b;
+    margin-left: 0.5cm;
 }
 .toc .toc-h1 { font-weight: 700; margin-top: 0.35cm; color: #0f2f4f; }
 .toc .toc-h2 { padding-left: 0.5cm; color: #333; }
@@ -158,7 +162,7 @@ code {
 }
 .codehilite pre code { background: none; padding: 0; }
 /* Plain (non-highlighted) code blocks, e.g. the diagram-render-failed fallback */
-pre:not(.codehilite pre) {
+pre:not(.codehilite pre):not(.diagram-failed pre) {
     background: #1e2530;
     color: #e6e6e6;
     padding: 0.35cm;
@@ -321,7 +325,20 @@ tr:nth-child(even) td { background: #f7f9fb; }
     margin: 0.4cm 0;
     page-break-inside: avoid;
 }
-.diagram img { max-width: 100%; }
+.diagram img {
+    max-width: 100%;
+    /* Keeps a very tall diagram from overflowing the page. Without this a
+       portrait flowchart renders past the bottom margin and is clipped. */
+    max-height: 21cm;
+}
+
+/* A figure too wide for the text column breaks out to the full page width.
+   The negative margins reclaim the 2.2cm page margins on each side. */
+.diagram-wide {
+    margin-left: -2.0cm;
+    margin-right: -2.0cm;
+}
+.diagram-wide img { max-width: none; width: 100%; }
 .diagram .caption {
     font-family: "Helvetica Neue", Arial, sans-serif;
     font-size: 8.5pt;
@@ -339,3 +356,37 @@ blockquote {
 }
 
 hr { border: none; border-top: 1px solid #dcdcdc; margin: 0.6cm 0; }
+
+/* ---------- Unrendered diagram ----------
+   Shown when a diagram's renderer is missing or errored. Deliberately loud:
+   the previous behaviour emitted an ordinary-looking dark code block, so a
+   book could ship with every diagram missing and look intentional. */
+.diagram-failed {
+    border: 1.5px dashed #c0392b;
+    border-radius: 5px;
+    background: #fdf3f2;
+    padding: 0.3cm 0.35cm;
+    margin: 0.4cm 0;
+    page-break-inside: avoid;
+}
+.diagram-failed-label {
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    font-size: 8.5pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #c0392b;
+    margin-bottom: 0.15cm;
+}
+.diagram-failed pre,
+.diagram-failed pre code {
+    background: none;
+    color: #6b2f28;
+    padding: 0;
+    margin: 0;
+    font-size: 8.2pt;
+    white-space: pre-wrap;
+}
+
+/* Modules are merged as <section>; the h1 rule already forces the break. */
+.module { page-break-before: auto; }

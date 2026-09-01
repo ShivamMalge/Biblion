@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "biblion"
+version = "0.2.0"
+description = "Turn plain markdown into a typeset PDF book, with real diagrams, locally and for free."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Shivam" }]
+keywords = ["markdown", "pdf", "book", "mermaid", "d2", "weasyprint", "typesetting"]
+classifiers = [
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Text Processing :: Markup :: Markdown",
+]
+
+dependencies = [
+    "markdown>=3.5",
+    "weasyprint>=60",
+    "pygments>=2.17",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pymupdf>=1.24"]
+
+[project.scripts]
+biblion = "biblion.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/shivam/biblion"
+
+[tool.setuptools]
+packages = ["biblion"]
+
+[tool.setuptools.package-data]
+biblion = ["themes/*.css", "authoring_prompt.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

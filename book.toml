@@ -1,0 +1,18 @@
+# Biblion book configuration.
+# Run `biblion build` in this folder to rebuild the PDF.
+
+title    = "Introduction to Containers w/ Docker, Kubernetes & OpenShift"
+subtitle = "Course 8 of the IBM RAG and Agentic AI Professional Certificate"
+author   = "Compiled for Shivam"
+eyebrow  = "IBM RAG & AGENTIC AI PROFESSIONAL CERTIFICATE · COURSE 8"
+
+input  = "modules"
+output = "output/ContainersDockerK8sOpenShift.pdf"
+
+toc       = true
+toc_depth = 3
+
+diagram_theme = "0"
+diagram_width = 1400
+
+strict = false

@@ -10,9 +10,16 @@ sample_course/output/
 **/modules_pdf/
 **/_diagram_cache/
 
+# Biblion's binary/browser-config/diagram cache
+.biblion/
+
 # Python
 __pycache__/
 *.pyc
+*.egg-info/
+build/
+dist/
+.pytest_cache/
 .venv/
 venv/
 
