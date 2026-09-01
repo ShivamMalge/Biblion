@@ -32,11 +32,12 @@ IS_WINDOWS = platform.system() == "Windows"
 _SUFFIXES = ["", ".exe", ".cmd", ".bat"] if IS_WINDOWS else [""]
 
 
-def _npm_global_dirs() -> list[Path]:
-    """Directories npm drops global shims into.
+def _fallback_bin_dirs() -> list[Path]:
+    """Places a tool can be without being on PATH.
 
-    Checked before falling back to `npm prefix -g`, which costs ~1s of node
-    startup and is not worth paying on every run.
+    Covers npm's global shim directories (so `npm i -g mermaid-cli` is found
+    even from a shell that has not picked up the PATH change) and the usual
+    user-local prefixes that installers write to.
     """
     candidates: list[Path] = []
     appdata = os.environ.get("APPDATA")
@@ -44,6 +45,7 @@ def _npm_global_dirs() -> list[Path]:
         candidates.append(Path(appdata) / "npm")
     candidates += [
         Path.home() / ".npm-global" / "bin",
+        Path.home() / ".local" / "bin",
         Path("/usr/local/bin"),
         Path("/opt/homebrew/bin"),
     ]
@@ -69,7 +71,7 @@ def find_binary(name: str, extra_dirs: tuple[str, ...] = ()) -> Path | None:
     2. the caller's extra directories (e.g. the project root)
     3. ``PATH``
     4. ``~/.biblion/bin`` (where ``biblion install`` puts things)
-    5. npm's global shim directories
+    5. npm's global shims and user-local bin directories
     """
     override = os.environ.get("BIBLION_" + name.upper().replace("-", "_"))
     if override:
@@ -86,7 +88,7 @@ def find_binary(name: str, extra_dirs: tuple[str, ...] = ()) -> Path | None:
     if on_path:
         return Path(on_path).resolve()
 
-    for directory in [BIN_DIR, *_npm_global_dirs()]:
+    for directory in [BIN_DIR, *_fallback_bin_dirs()]:
         hit = _probe(directory, name)
         if hit:
             return hit

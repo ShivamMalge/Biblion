@@ -72,7 +72,12 @@ jobs:
         run: npm install -g @mermaid-js/mermaid-cli
 
       - name: Install d2
-        run: curl -fsSL https://d2lang.com/install.sh | sh -s --
+        # Into a user-local prefix so the install needs no sudo, with a
+        # privileged install as the fallback if the script lacks --prefix.
+        run: |
+          curl -fsSL https://d2lang.com/install.sh | sh -s -- --prefix "$HOME/.local" \
+            || curl -fsSL https://d2lang.com/install.sh | sudo sh -s --
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Install Biblion
         run: |

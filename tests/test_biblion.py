@@ -12,8 +12,14 @@ from biblion import config, diagrams, document, tools
 
 
 @pytest.fixture(autouse=True)
-def _clear_tool_caches():
-    """Tool discovery is lru_cached, so a faked result would leak between tests."""
+def _isolate_tools(tmp_path, monkeypatch):
+    """Keep the test run out of the user's real ~/.biblion.
+
+    Tool discovery is lru_cached, so a faked result would otherwise leak
+    between tests, and constructing a renderer writes a puppeteer config.
+    """
+    monkeypatch.setattr(tools, "CACHE_DIR", tmp_path / "cache")
+    monkeypatch.setattr(tools, "BIN_DIR", tmp_path / "bin")
     tools.find_binary.cache_clear()
     tools.find_browser.cache_clear()
     yield
