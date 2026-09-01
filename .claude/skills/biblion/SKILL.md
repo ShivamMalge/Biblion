@@ -107,6 +107,17 @@ client -> cluster.svc
 ```
 ````
 
+Caption anything worth finding again, with `caption="..."` on the fence:
+
+````
+```d2 caption="How the pieces fit together."
+a -> b
+```
+````
+
+Biblion numbers captioned figures, keeps caption and figure on the same page,
+and builds a "Figures" page. Never number a figure yourself.
+
 Rules:
 
 - Quote labels containing spaces or punctuation: `A["Like this"]`.

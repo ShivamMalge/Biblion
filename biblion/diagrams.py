@@ -50,8 +50,20 @@ def fit_scale(width: int, height: int) -> float:
     return min(BOX_W / width, BOX_H / height)
 
 
-MERMAID_BLOCK_RE = re.compile(r"```mermaid[ \t]*\n(.*?)\n```", re.DOTALL)
-D2_BLOCK_RE = re.compile(r"```d2[ \t]*\n(.*?)\n```", re.DOTALL)
+# The info string after the language is captured so a block can carry
+# attributes, currently just caption="...".
+MERMAID_BLOCK_RE = re.compile(r"```mermaid[ \t]*([^\n]*)\n(.*?)\n```", re.DOTALL)
+D2_BLOCK_RE = re.compile(r"```d2[ \t]*([^\n]*)\n(.*?)\n```", re.DOTALL)
+
+CAPTION_RE = re.compile(r"""caption\s*=\s*(?:"([^"]*)"|'([^']*)')""")
+
+
+def parse_caption(attrs: str) -> str:
+    """Pull caption="..." out of a fence's info string."""
+    match = CAPTION_RE.search(attrs or "")
+    if not match:
+        return ""
+    return (match.group(1) if match.group(1) is not None else match.group(2)).strip()
 
 # Rendered wide, then scaled down by CSS into a ~16cm column. 1400px across
 # roughly 16.6cm works out to ~215dpi in the PDF, which stays crisp in print.
@@ -351,16 +363,18 @@ class DiagramRenderer:
     # -- markdown substitution -------------------------------------------
 
     def process(self, md_text: str) -> str:
-        """Replace every diagram block in a markdown document with an <img>."""
+        """Replace every diagram block in a markdown document with a <figure>."""
         md_text = MERMAID_BLOCK_RE.sub(
-            lambda m: self._substitute(m.group(1), self.render_mermaid, "mermaid"),
+            lambda m: self._substitute(m.group(2), self.render_mermaid, "mermaid",
+                                       parse_caption(m.group(1))),
             md_text)
         md_text = D2_BLOCK_RE.sub(
-            lambda m: self._substitute(m.group(1), self.render_d2, "d2"),
+            lambda m: self._substitute(m.group(2), self.render_d2, "d2",
+                                       parse_caption(m.group(1))),
             md_text)
         return md_text
 
-    def _substitute(self, code, render, kind: str) -> str:
+    def _substitute(self, code, render, kind: str, caption: str = "") -> str:
         png_path = render(code)
         if png_path is not None:
             width, height = png_size(png_path)
@@ -368,14 +382,21 @@ class DiagramRenderer:
             # page width instead of just the text column -- the extra 3cm is
             # the difference between readable and not.
             wide = " diagram-wide" if width / max(height, 1) > FULL_BLEED_ABOVE_ASPECT else ""
+            # The caption travels inside the <figure> so the two can never be
+            # split across a page break.
+            caption_html = (f"<figcaption>{_escape(caption)}</figcaption>"
+                            if caption else "")
             # A file:// URI keeps Windows drive letters and spaces intact,
             # which a bare path in an src= attribute does not.
-            return (f'<div class="diagram{wide}">'
-                    f'<img src="{png_path.as_uri()}"></div>')
+            return (f'<figure class="diagram{wide}">'
+                    f'<img src="{png_path.as_uri()}">{caption_html}</figure>')
         # Preserve the source so nothing is lost from the document, but make
         # it visibly a failure rather than a mysterious black box.
+        caption_html = (f'<div class="diagram-failed-caption">{_escape(caption)}</div>'
+                        if caption else "")
         return (f'<div class="diagram-failed">'
                 f'<div class="diagram-failed-label">Unrendered {kind} diagram</div>'
+                f'{caption_html}'
                 f'<pre><code>{_escape(code)}</code></pre></div>')
 
 

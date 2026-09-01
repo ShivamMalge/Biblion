@@ -31,6 +31,8 @@ class BookConfig:
     toc: bool = True
     toc_depth: int = 3
     cover: bool = True
+    # A "Figures" page listing every captioned diagram.
+    figure_list: bool = True
 
     # diagrams
     diagram_theme: str = "0"
@@ -137,6 +139,9 @@ output = "output/{slug}.pdf"
 # Contents page: include it, and how deep to go (1 = H1 only).
 toc       = true
 toc_depth = 3
+
+# List every captioned diagram on its own "Figures" page.
+figure_list = true
 
 # Diagram rendering. d2 theme id; see `d2 themes`.
 diagram_theme = "0"

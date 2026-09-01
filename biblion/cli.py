@@ -75,7 +75,8 @@ def cmd_build(args) -> int:
     html_doc = document.assemble(
         sources, title=config.title, subtitle=config.subtitle,
         author=config.author, eyebrow=config.eyebrow, renderer=renderer,
-        toc=config.toc, toc_depth=config.toc_depth, cover=config.cover)
+        toc=config.toc, toc_depth=config.toc_depth, cover=config.cover,
+        figure_list=config.figure_list)
 
     HTML(string=html_doc, base_url=str(base)).write_pdf(
         str(out_path), stylesheets=[str(stylesheet)])
@@ -91,7 +92,8 @@ def cmd_build(args) -> int:
                     text, path.stem.replace("_", " ").title()),
                 subtitle=config.subtitle, author=config.author,
                 eyebrow=config.eyebrow, renderer=renderer,
-                toc=config.toc, toc_depth=config.toc_depth, cover=config.cover)
+                toc=config.toc, toc_depth=config.toc_depth,
+                cover=config.cover, figure_list=config.figure_list)
             single_out = module_dir / f"{path.stem}.pdf"
             HTML(string=single, base_url=str(base)).write_pdf(
                 str(single_out), stylesheets=[str(stylesheet)])
@@ -305,6 +307,9 @@ def _add_build_flags(parser: argparse.ArgumentParser) -> None:
                         help="Omit the contents page")
     parser.add_argument("--no-cover", dest="cover", action="store_const", const=False,
                         help="Omit the cover page")
+    parser.add_argument("--no-figure-list", dest="figure_list",
+                        action="store_const", const=False,
+                        help="Omit the list of figures")
     parser.add_argument("--per-module", action="store_const", const=True,
                         help="Also emit one PDF per source file")
     parser.add_argument("--strict", action="store_const", const=True,

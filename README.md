@@ -135,6 +135,22 @@ flowchart LR
 ```
 ````
 
+## Figures
+
+Give a diagram a caption and it becomes a numbered figure:
+
+````
+```d2 caption="How a request reaches a pod."
+client -> ingress -> pod
+```
+````
+
+Biblion numbers it per chapter ("Figure 2.3"), keeps the caption in the same
+unbreakable block as the diagram so the two never split across a page, and
+builds a **Figures** page with real page numbers. Uncaptioned diagrams are
+left alone: not numbered, not listed. Turn the page off with
+`--no-figure-list`.
+
 ## Diagram auto-fit
 
 A ten-node `flowchart LR` is an 11:1 strip. Squeezed into a portrait text

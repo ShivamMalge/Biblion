@@ -94,6 +94,23 @@ service -> client: "201 Created"
 Useful d2 shapes: `person`, `cylinder` (datastores), `page`, `document`,
 `hexagon`, `queue`. Use them sparingly, where they carry meaning.
 
+### Captions
+
+Give a diagram a caption with `caption="..."` on the opening fence. Biblion
+numbers it ("Figure 2.3"), keeps the caption glued to its figure across page
+breaks, and lists it on a "Figures" page with a real page number.
+
+````
+```mermaid caption="How a request reaches a pod."
+flowchart LR
+    A["Client"] --> B["Ingress"]
+```
+````
+
+Caption anything a reader might want to find again. Write the caption as a
+sentence saying what the figure shows, not a restatement of its title, and do
+not number it yourself -- Biblion does that.
+
 Diagram rules:
 
 - Always quote node labels that contain spaces or punctuation: `A["Like this"]`.

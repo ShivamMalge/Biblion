@@ -326,3 +326,61 @@ def test_linux_hint_names_the_apt_packages(monkeypatch):
     hint = "\n".join(cli._weasyprint_hint("cannot load library 'libgobject-2.0-0'"))
     assert "libpango" in hint
     assert "DYLD" not in hint
+
+
+# --- figures ---------------------------------------------------------------
+
+def test_caption_parsed_from_fence():
+    assert diagrams.parse_caption('caption="A pipeline"') == "A pipeline"
+    assert diagrams.parse_caption("caption='A pipeline'") == "A pipeline"
+    assert diagrams.parse_caption("") == ""
+    assert diagrams.parse_caption("someotherattr=1") == ""
+
+
+def test_diagram_block_regex_separates_attrs_from_code():
+    md = '```d2 caption="Hi"\na -> b\n```'
+    match = diagrams.D2_BLOCK_RE.search(md)
+    assert diagrams.parse_caption(match.group(1)) == "Hi"
+    assert match.group(2) == "a -> b"
+
+
+def test_plain_fence_still_parses():
+    match = diagrams.MERMAID_BLOCK_RE.search("```mermaid\nflowchart TD\n  A --> B\n```")
+    assert match.group(1).strip() == ""
+    assert "flowchart TD" in match.group(2)
+
+
+def test_figures_are_numbered_per_chapter():
+    body = ('<h1 id="a">One</h1>'
+            '<figure class="diagram"><img><figcaption>First</figcaption></figure>'
+            '<figure class="diagram"><img><figcaption>Second</figcaption></figure>'
+            '<h1 id="b">Two</h1>'
+            '<figure class="diagram"><img><figcaption>Third</figcaption></figure>')
+    out, entries = document.number_figures(body)
+    assert "Figure 1.1" in out and "Figure 1.2" in out and "Figure 2.1" in out
+    assert [e[0] for e in entries] == ["fig-1-1", "fig-1-2", "fig-2-1"]
+
+
+def test_uncaptioned_figures_are_not_numbered():
+    body = ('<h1 id="a">One</h1>'
+            '<figure class="diagram"><img></figure>'
+            '<figure class="diagram"><img><figcaption>Only me</figcaption></figure>')
+    out, entries = document.number_figures(body)
+    assert len(entries) == 1
+    # The captioned one is still 1.1: the uncaptioned figure does not consume
+    # a number.
+    assert "Figure 1.1" in out
+    assert entries[0][1].startswith("Figure 1.1")
+
+
+def test_figure_list_links_to_ids():
+    _, entries = document.number_figures(
+        '<h1 id="a">C</h1><figure class="diagram">'
+        '<img><figcaption>Cap</figcaption></figure>')
+    listing = document.build_figure_list(entries)
+    assert 'href="#fig-1-1"' in listing
+    assert "Cap" in listing
+
+
+def test_no_figure_list_when_there_are_no_figures():
+    assert document.build_figure_list([]) == ""

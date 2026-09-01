@@ -10,7 +10,7 @@ Asking an AI to *draw* a diagram means asking it to emit SVG paths or an ASCII
 grid: hundreds of tokens, and the result is usually crooked. Asking it for
 diagram *source* costs about thirty tokens and produces a real figure.
 
-```d2
+```d2 caption="Where the money goes: tokens are spent once on content, and layout is re-run for free."
 direction: right
 
 paid: "Paid once, in tokens" {
@@ -44,7 +44,7 @@ paid.md -> free.biblion
 d2's strength is nesting. Things that live inside other things are drawn
 inside other things, which is tedious to express in mermaid.
 
-```d2
+```d2 caption="d2 draws containment as containment, which mermaid's subgraphs struggle with."
 cluster: "Kubernetes cluster" {
   style.stroke: "#2e6da4"
 
@@ -81,7 +81,7 @@ registry -> cluster.deploy: "image pull"
 
 d2 also does sequence diagrams, which read well for protocol walkthroughs.
 
-```d2
+```d2 caption="A request through the gateway, as a d2 sequence diagram."
 shape: sequence_diagram
 
 client: Client
@@ -101,7 +101,7 @@ gw -> client: "201 Created"
 
 mermaid is the better fit for process flows and state machines.
 
-```mermaid
+```mermaid caption="From source to a running pod. Authored left-to-right; re-laid out to fit the page."
 flowchart LR
     A["Source code<br/>+ Dockerfile"] -->|docker build| B["Image<br/>(immutable layers)"]
     B -->|docker push| C[("Registry")]
@@ -121,7 +121,7 @@ flowchart LR
 
 ### A state machine
 
-```mermaid
+```mermaid caption="The lifecycle of a Kubernetes pod."
 stateDiagram-v2
     [*] --> Pending
     Pending --> Running: scheduled

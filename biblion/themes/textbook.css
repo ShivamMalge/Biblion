@@ -329,8 +329,42 @@ tr:nth-child(even) td { background: #f7f9fb; }
     max-width: 100%;
     /* Keeps a very tall diagram from overflowing the page. Without this a
        portrait flowchart renders past the bottom margin and is clipped. */
-    max-height: 21cm;
+    max-height: 20cm;
 }
+
+/* The caption lives inside the <figure>, and the figure never splits, so a
+   caption can never be orphaned onto the page after its diagram. */
+figure.diagram {
+    margin: 0.5cm 0;
+    page-break-inside: avoid;
+}
+.diagram figcaption {
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    font-size: 8.6pt;
+    line-height: 1.4;
+    color: #555;
+    text-align: center;
+    margin-top: 0.22cm;
+    padding: 0 1cm;
+}
+.diagram .figure-label {
+    font-weight: 700;
+    color: #16456e;
+    margin-right: 0.28em;
+}
+/* A full-bleed figure's caption stays within the text column. */
+.diagram-wide figcaption { padding: 0 3cm; }
+
+.diagram-failed-caption {
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    font-size: 8.6pt;
+    font-style: italic;
+    color: #6b2f28;
+    margin-bottom: 0.15cm;
+}
+
+/* ---------- List of figures ---------- */
+.figure-list li { font-size: 9.8pt; }
 
 /* A figure too wide for the text column breaks out to the full page width.
    The negative margins reclaim the 2.2cm page margins on each side. */
