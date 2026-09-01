@@ -121,6 +121,12 @@ jobs:
       - name: Show what was detected
         run: biblion doctor
 
+      - name: Unit tests (with rendering libraries available)
+        # The `test` job skips the tests that render a real PDF, because it has
+        # no Pango. This job does have it, so run the suite here too and let
+        # those tests actually execute on Linux and macOS.
+        run: python -m pytest tests/ -q
+
       - name: Build the example book
         # --strict turns any unrendered diagram into a failed build, which is
         # the whole point of running this in CI.

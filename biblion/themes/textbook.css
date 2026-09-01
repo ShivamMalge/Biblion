@@ -5,18 +5,31 @@
 
 @page {
     size: A4;
-    margin: 2.4cm 2.2cm 2.6cm 2.2cm;
+    margin: 2.6cm 2.2cm 2.6cm 2.2cm;
     @bottom-center {
         content: counter(page);
         font-family: "Georgia", serif;
         font-size: 9pt;
         color: #6b6b6b;
     }
+    /* Running head: which chapter am I in? Fed by string-set on .module h1
+       below, and carried automatically onto continuation pages. Right-aligned
+       on its own, rather than paired with the book title on the left, because
+       a long title and a long chapter name would collide. */
+    @top-right {
+        content: string(chapter);
+        font-family: "Helvetica Neue", Arial, sans-serif;
+        font-size: 8.5pt;
+        color: #8a8a8a;
+        vertical-align: bottom;
+        padding-bottom: 0.5cm;
+    }
 }
 
 @page :first {
     margin: 0;
     @bottom-center { content: none; }
+    @top-right { content: none; }
 }
 
 * { box-sizing: border-box; }
@@ -105,6 +118,8 @@ body {
 .toc .toc-h3 { padding-left: 1.0cm; color: #555; font-size: 9.8pt; }
 
 /* ---------- Headings ---------- */
+.module h1 { string-set: chapter content(); }
+
 h1 {
     font-family: "Helvetica Neue", Arial, sans-serif;
     font-size: 19pt;

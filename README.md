@@ -3,6 +3,16 @@
 Turn plain markdown into a typeset PDF book — with real rendered diagrams —
 locally, and for free on every run.
 
+<p align="center">
+  <img src="docs/images/cover.png" width="32%" alt="Cover page">
+  <img src="docs/images/page-with-figure.png" width="32%" alt="A page with a rendered figure and caption">
+  <img src="docs/images/d2-containment.png" width="32%" alt="A d2 architecture diagram">
+</p>
+
+<p align="center"><em>Every page above was produced from plain markdown by
+<code>biblion build</code>. Regenerate them with
+<code>python scripts/screenshots.py</code>.</em></p>
+
 ## Why
 
 Asking an AI to produce a beautiful PDF is expensive. It burns thousands of
@@ -25,6 +35,14 @@ The AI spends tokens on *information*. Biblion owns *presentation* — cover
 page, contents with real page numbers, callout boxes, syntax highlighting,
 page-break rules, and diagram rendering. Change the theme and rebuild; you
 never pay tokens again.
+
+<p align="center">
+  <img src="docs/images/contents.png" width="45%" alt="Contents page with page numbers">
+  <img src="docs/images/figures.png" width="45%" alt="List of figures">
+</p>
+
+<p align="center"><em>Contents and Figures pages, both with real page numbers.
+Neither is written by hand.</em></p>
 
 ## Install
 
@@ -151,6 +169,12 @@ builds a **Figures** page with real page numbers. Uncaptioned diagrams are
 left alone: not numbered, not listed. Turn the page off with
 `--no-figure-list`.
 
+## Running headers
+
+Every page after the front matter carries the current chapter's name in the
+top margin, so a reader landing on page 47 knows where they are. It updates at
+each `#` and carries across continuation pages automatically.
+
 ## Diagram auto-fit
 
 A ten-node `flowchart LR` is an 11:1 strip. Squeezed into a portrait text
@@ -202,4 +226,6 @@ biblion/
   themes/textbook.css  the stylesheet that does the actual work
   authoring_prompt.md  the contract `biblion prompt` prints
   skill/SKILL.md       the Claude Code skill `biblion skill` installs
+examples/diagram-tour  a worked example exercising both renderers
+scripts/screenshots.py regenerates the images in this README
 ```

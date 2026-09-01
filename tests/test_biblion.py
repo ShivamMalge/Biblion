@@ -384,3 +384,67 @@ def test_figure_list_links_to_ids():
 
 def test_no_figure_list_when_there_are_no_figures():
     assert document.build_figure_list([]) == ""
+
+
+# --- running headers -------------------------------------------------------
+#
+# These render a real PDF, so they need WeasyPrint's system libraries. The
+# unit-test CI job deliberately does not install those; the book-building job
+# does, and runs these for real.
+
+class _NullRenderer:
+    """A renderer that leaves markdown untouched, for layout-only tests."""
+
+    def process(self, md_text):
+        return md_text
+
+
+def _render_pdf_or_skip(html_text, out_path):
+    try:
+        from weasyprint import HTML
+    except Exception as exc:  # noqa: BLE001 - missing pango, not a test failure
+        pytest.skip(f"weasyprint unavailable: {exc}")
+    from biblion.cli import THEME_DIR
+    HTML(string=html_text).write_pdf(
+        str(out_path), stylesheets=[str(THEME_DIR / "textbook.css")])
+    return pytest.importorskip("fitz").open(str(out_path))
+
+
+def _header_bands(doc):
+    """The text sitting in each page's top margin box."""
+    bands = []
+    for i in range(doc.page_count):
+        height = doc[i].rect.height
+        spans = [s["text"].strip()
+                 for block in doc[i].get_text("dict")["blocks"]
+                 for line in block.get("lines", [])
+                 for s in line["spans"]
+                 if s["bbox"][1] < height * 0.075]
+        bands.append(" ".join(spans))
+    return bands
+
+
+def test_running_header_names_the_current_chapter(tmp_path):
+    md = ("# Chapter One\n\n" + ("Filler sentence. " * 500)
+          + "\n\n# Chapter Two\n\n" + ("Other text. " * 500))
+    html = document.assemble([(Path("a.md"), md)], title="T",
+                             renderer=_NullRenderer(), toc=False, cover=False,
+                             figure_list=False)
+    doc = _render_pdf_or_skip(html, tmp_path / "headers.pdf")
+    bands = _header_bands(doc)
+    assert any("Chapter One" in b for b in bands), bands
+    assert any("Chapter Two" in b for b in bands), bands
+    # The header must follow the chapter, not show One while inside Two.
+    first_two = next(i for i, b in enumerate(bands) if "Chapter Two" in b)
+    assert "Chapter One" not in bands[first_two]
+
+
+def test_cover_page_has_no_running_header(tmp_path):
+    md = "# Chapter One\n\n" + ("Filler. " * 300)
+    html = document.assemble([(Path("a.md"), md)], title="The Book Title",
+                             renderer=_NullRenderer(), toc=False, cover=True,
+                             figure_list=False)
+    doc = _render_pdf_or_skip(html, tmp_path / "cover.pdf")
+    # The cover carries its own title as body text; what must not appear is a
+    # running head, and the cover's <h1> must never become one.
+    assert "Chapter One" not in _header_bands(doc)[0]
