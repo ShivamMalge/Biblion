@@ -167,6 +167,9 @@ class DiagramRenderer:
         # Called with a one-line status per diagram. Rendering is slow and
         # silent otherwise, which makes a stall indistinguishable from work.
         self.progress = progress or (lambda message: None)
+        # Set once the browser rasteriser fails, so the rest of the build does
+        # not pay its timeout again for every remaining diagram.
+        self._browser_rasteriser_failed = False
         self.report = DiagramReport()
 
         self.mmdc = tools.find_binary("mmdc", project_dirs)
@@ -269,7 +272,12 @@ class DiagramRenderer:
         #    behind an interactive prompt, so only with consent.
         attempts: list[tuple[str, object]] = []
 
-        if self.browser is not None:
+        # One strike and the browser is out for the rest of the build. Headless
+        # Chrome does not work on macOS CI runners (every screenshot times out),
+        # and paying the full timeout once per diagram turned a 30-second build
+        # into a 450-second one. Whatever makes the first render fail will make
+        # the next one fail too.
+        if self.browser is not None and not self._browser_rasteriser_failed:
             attempts.append(("browser", lambda: tools.browser_svg_to_png(
                 self.browser, svg_path, png_path, target_width=self.width)))
 
@@ -290,6 +298,13 @@ class DiagramRenderer:
                 return True
             errors.append(f"{name}: {detail}")
             self.progress(f"    {name} could not rasterise d2 {key[:8]}: {detail}")
+            if name == "browser":
+                self._browser_rasteriser_failed = True
+                remaining = [n for n, _ in attempts if n != "browser"]
+                if remaining:
+                    self.progress(
+                        f"    falling back to {remaining[0]} for the rest of "
+                        f"this build")
 
         self.report.failed.append((f"d2:{key}", " | ".join(errors)[:400]))
         return False

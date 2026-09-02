@@ -25,6 +25,18 @@ This project follows [Semantic Versioning](https://semver.org/).
   Previously a typo in a config file produced a stack trace, and a
   wrong-typed value crashed much later inside the page-numbering code.
 
+### Fixed
+
+- **A build no longer pays the browser timeout once per diagram.** Headless
+  Chrome screenshotting fails on macOS, and Biblion was waiting the full
+  timeout for every d2 diagram in turn — 450 seconds of a CI build spent on
+  attempts that could never succeed. The first failure now switches the whole
+  build to the next rasteriser, and says so.
+- The browser rasteriser retries once in legacy headless mode before giving
+  up, and the default timeout is 45s rather than 90s.
+- Documented that `rsvg-convert`, the fallback, does not honour d2's embedded
+  fonts, so diagram labels lose bold and italic when it is used.
+
 ## [0.2.0] — 2026-09-02
 
 First public release.

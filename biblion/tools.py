@@ -167,7 +167,12 @@ def svg_dimensions(svg_path: Path) -> tuple[int, int] | None:
     return None
 
 
-BROWSER_TIMEOUT = int(os.environ.get("BIBLION_BROWSER_TIMEOUT", "90"))
+BROWSER_TIMEOUT = int(os.environ.get("BIBLION_BROWSER_TIMEOUT", "45"))
+
+# Tried in order. `--headless=new` is the modern mode and is what works on
+# Windows and Linux; on macOS CI runners it times out every time, so the
+# legacy mode is worth one retry before giving up on the browser entirely.
+HEADLESS_MODES = ("--headless=new", "--headless")
 
 
 def browser_svg_to_png(browser: Path, svg_path: Path, png_path: Path,
@@ -190,48 +195,56 @@ def browser_svg_to_png(browser: Path, svg_path: Path, png_path: Path,
     # blow up a tiny diagram to absurd pixel dimensions.
     scale = max(1, min(max_scale, round(target_width / max(width, 1))))
 
-    # A throwaway profile per invocation. Sharing one directory means Chrome
-    # writes a SingletonLock into it, and a previous run that did not exit
-    # cleanly leaves that lock behind -- the next launch then blocks on it
-    # forever instead of failing. A fresh directory cannot collide.
-    profile_dir = Path(tempfile.mkdtemp(prefix="biblion-browser-"))
 
-    png_path.unlink(missing_ok=True)
-    cmd = [
-        str(browser), "--headless=new",
-        "--disable-gpu", "--no-sandbox", "--hide-scrollbars",
-        # Keep a CI or first-run browser from waiting on anything interactive
-        # or network-bound. None of this is needed to draw a local SVG.
-        "--no-first-run", "--no-default-browser-check", "--disable-extensions",
-        "--disable-background-networking", "--disable-sync",
-        "--disable-default-apps", "--disable-dev-shm-usage", "--mute-audio",
-        # Without a virtual time budget, headless Chrome can wait forever for
-        # the page to go "idle" and never take the shot. Our SVGs are static
-        # and self-contained, so a short budget is always enough.
-        "--virtual-time-budget=5000",
-        f"--user-data-dir={profile_dir}",
-        f"--force-device-scale-factor={scale}",
-        f"--window-size={width},{height}",
-        f"--screenshot={png_path}",
-        svg_path.as_uri(),
-    ]
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True,
-                                timeout=timeout)
-    except subprocess.TimeoutExpired:
-        return False, (
-            f"browser timed out after {timeout}s rendering {svg_path.name}. "
-            f"Set BIBLION_BROWSER_TIMEOUT to raise the limit, or "
-            f"BIBLION_BROWSER to point at a different browser.")
-    except Exception as exc:  # noqa: BLE001
-        return False, f"{type(exc).__name__}: {exc}"
-    finally:
-        shutil.rmtree(profile_dir, ignore_errors=True)
+    errors = []
+    for mode in HEADLESS_MODES:
+        # A throwaway profile per attempt. Sharing one directory means Chrome
+        # writes a SingletonLock into it, and a run that did not exit cleanly
+        # leaves that lock behind -- the next launch then blocks on it forever
+        # instead of failing. A fresh directory cannot collide.
+        profile_dir = Path(tempfile.mkdtemp(prefix="biblion-browser-"))
+        png_path.unlink(missing_ok=True)
+        cmd = [
+            str(browser), mode,
+            "--disable-gpu", "--no-sandbox", "--hide-scrollbars",
+            # Keep a CI or first-run browser from waiting on anything
+            # interactive or network-bound. None of this is needed to draw a
+            # local SVG.
+            "--no-first-run", "--no-default-browser-check", "--disable-extensions",
+            "--disable-background-networking", "--disable-sync",
+            "--disable-default-apps", "--disable-dev-shm-usage", "--mute-audio",
+            # Without a virtual time budget, headless Chrome can wait forever
+            # for the page to go "idle" and never take the shot. Our SVGs are
+            # static and self-contained, so a short budget is always enough.
+            "--virtual-time-budget=5000",
+            f"--user-data-dir={profile_dir}",
+            f"--force-device-scale-factor={scale}",
+            f"--window-size={width},{height}",
+            f"--screenshot={png_path}",
+            svg_path.as_uri(),
+        ]
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True,
+                                    timeout=timeout)
+        except subprocess.TimeoutExpired:
+            errors.append(f"{mode} timed out after {timeout}s")
+            continue
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"{mode}: {type(exc).__name__}: {exc}")
+            continue
+        finally:
+            shutil.rmtree(profile_dir, ignore_errors=True)
 
-    if png_path.is_file() and png_path.stat().st_size > 0:
-        return True, ""
-    detail = (result.stderr or result.stdout or "").strip()
-    return False, detail.splitlines()[-1][:200] if detail else "browser wrote no image"
+        if png_path.is_file() and png_path.stat().st_size > 0:
+            return True, ""
+        detail = (result.stderr or result.stdout or "").strip()
+        errors.append(f"{mode}: "
+                      + (detail.splitlines()[-1][:120] if detail else "wrote no image"))
+
+    return False, (
+        f"could not rasterise {svg_path.name} ({'; '.join(errors)}). "
+        f"Set BIBLION_BROWSER_TIMEOUT to raise the limit, or BIBLION_BROWSER "
+        f"to point at a different browser.")
 
 
 def puppeteer_config(explicit: str | None = None) -> Path | None:

@@ -116,8 +116,25 @@ and uses it for both renderers: it points mermaid-cli at it, and screenshots
 d2's SVG output with it. **Neither puppeteer nor d2 has to download its own
 ~150MB Chromium.** Set `BIBLION_BROWSER` to override the choice.
 
-`rsvg-convert` is not required. If you happen to have it, Biblion uses it for
-d2 as a fallback when no browser is available.
+### A caveat on macOS
+
+Headless Chrome screenshotting is known to fail on macOS CI runners — every
+d2 screenshot times out. Biblion notices on the first diagram, says so, and
+falls back to `rsvg-convert` for the rest of the build.
+
+That fallback works, but `rsvg-convert` does not honour the fonts d2 embeds in
+its SVG, so **diagram labels lose their bold and italic** and come out flat.
+Everything else — layout, colours, arrows — is correct.
+
+So on macOS, install the fallback:
+
+```bash
+brew install librsvg
+```
+
+If your Mac renders d2 through the browser without complaint, you will see no
+fallback message and your diagrams keep their proper typography. Biblion tries
+both headless modes before giving up.
 
 ## Quickstart
 
@@ -438,6 +455,10 @@ the message quotes the parse error from mermaid or d2.
 **d2 says it needs to install Chromium.** It only asks when Biblion found no
 browser. Install Chrome or Edge, set `BIBLION_BROWSER`, or pass
 `--allow-downloads` to accept the download.
+
+**Diagram labels lost their bold and italic.** The browser rasteriser failed
+and Biblion fell back to `rsvg-convert`, which ignores d2's embedded fonts.
+The build says so when it happens. See [the macOS caveat](#a-caveat-on-macos).
 
 **A diagram is unreadably small.** It's probably very wide. Auto-fit will have
 tried the other orientation already; splitting it into two diagrams almost

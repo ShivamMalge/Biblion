@@ -571,3 +571,66 @@ def test_correct_types_are_accepted(tmp_path):
 def test_config_error_is_a_value_error():
     """Subclassing ValueError keeps older callers working."""
     assert issubclass(config.ConfigError, ValueError)
+
+
+# --- rasteriser fallback ---------------------------------------------------
+
+class _BrokenBrowserRenderer(diagrams.DiagramRenderer):
+    """d2 present, browser present but always failing, rsvg available."""
+
+    def __init__(self, cache_dir):
+        super().__init__(cache_dir)
+        self.d2 = Path("d2")
+        self.browser = Path("browser")
+        self.rsvg = Path("rsvg-convert")
+
+
+def test_browser_failure_disables_it_for_the_rest_of_the_build(tmp_path, monkeypatch):
+    """Headless Chrome fails on macOS. Paying its timeout per diagram turned a
+    30-second build into a 450-second one, so one failure must be enough."""
+    renderer = _BrokenBrowserRenderer(tmp_path)
+    calls = []
+
+    def fake_browser(*args, **kwargs):
+        calls.append("browser")
+        return False, "timed out"
+
+    def fake_run_quiet(cmd, expected, stdin_text=None):
+        calls.append("other")
+        expected.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 8
+                             + (100).to_bytes(4, "big") + (100).to_bytes(4, "big"))
+        return True, ""
+
+    monkeypatch.setattr(tools, "browser_svg_to_png", fake_browser)
+    monkeypatch.setattr(renderer, "_run_quiet", fake_run_quiet)
+
+    for i in range(3):
+        renderer._d2_to_png(f"a -> b{i}", tmp_path / f"d{i}.png", f"k{i}")
+
+    # The browser is tried once, never again; everything else uses the fallback.
+    assert calls.count("browser") == 1, calls
+    assert renderer._browser_rasteriser_failed
+
+
+def test_browser_success_does_not_disable_it(tmp_path, monkeypatch):
+    renderer = _BrokenBrowserRenderer(tmp_path)
+    calls = []
+
+    def fake_run_quiet(cmd, expected, stdin_text=None):
+        expected.write_bytes(b"stub svg")
+        return True, ""
+
+    def fake_browser(*args, **kwargs):
+        calls.append("browser")
+        return True, ""
+
+    monkeypatch.setattr(tools, "browser_svg_to_png", fake_browser)
+    monkeypatch.setattr(renderer, "_run_quiet", fake_run_quiet)
+    for i in range(3):
+        renderer._d2_to_png(f"a -> b{i}", tmp_path / f"d{i}.png", f"k{i}")
+    assert calls.count("browser") == 3
+    assert not renderer._browser_rasteriser_failed
+
+
+def test_browser_rasteriser_tries_both_headless_modes():
+    assert tools.HEADLESS_MODES == ("--headless=new", "--headless")
