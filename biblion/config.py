@@ -136,6 +136,9 @@ eyebrow  = ""
 input  = "modules"
 output = "output/{slug}.pdf"
 
+# Look: "textbook" for course notes, "report" for API docs and specs.
+theme = "textbook"
+
 # Contents page: include it, and how deep to go (1 = H1 only).
 toc       = true
 toc_depth = 3

@@ -54,6 +54,11 @@ good default; split long material rather than writing one enormous file.
 biblion build <folder>
 ```
 
+Two themes ship: `textbook` (the default — course notes, study material)
+and `report` (`--theme report` — API documentation, specifications, technical
+reports; denser and sans-serif). Pick the one that matches what the user
+asked for.
+
 Read the `Diagrams:` line in the output. If it reports failures, fix the
 diagram source and rebuild — do not leave a book with unrendered figures.
 Add `--strict` to make a failed diagram fail the build.

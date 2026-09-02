@@ -448,3 +448,82 @@ def test_cover_page_has_no_running_header(tmp_path):
     # The cover carries its own title as body text; what must not appear is a
     # running head, and the cover's <h1> must never become one.
     assert "Chapter One" not in _header_bands(doc)[0]
+
+
+# --- themes ----------------------------------------------------------------
+#
+# Parametrised over whatever ships in themes/, so a theme added later is
+# checked automatically rather than needing someone to remember.
+
+def _theme_names():
+    from biblion.cli import THEME_DIR
+    return sorted(p.stem for p in THEME_DIR.glob("*.css"))
+
+
+def _theme_css(name):
+    from biblion.cli import THEME_DIR
+    return (THEME_DIR / f"{name}.css").read_text(encoding="utf-8")
+
+
+# Structural hooks the document generator emits. A theme missing one of these
+# does not error -- it silently renders something ugly, which is worse.
+REQUIRED_SELECTORS = [
+    "@page", "@page :first", ".cover", ".cover .eyebrow", ".cover .subtitle",
+    ".cover .meta", ".toc", ".figure-list",
+    ".module h1", "string-set", ".codehilite", "table", "th", "td",
+    ".admonition", ".admonition-title", ".diagram", "figcaption",
+    ".figure-label", ".diagram-wide", ".diagram-failed",
+    ".diagram-failed-label", "blockquote",
+    # The contents page must resolve real page numbers. Which pseudo-element
+    # carries them is the theme's business -- textbook uses ::before, report
+    # uses ::after -- so require the mechanism, not one spelling of it.
+    "target-counter",
+]
+
+
+@pytest.mark.parametrize("theme", _theme_names())
+def test_theme_covers_every_structural_hook(theme):
+    css = _theme_css(theme)
+    missing = [sel for sel in REQUIRED_SELECTORS if sel not in css]
+    assert not missing, f"{theme}.css is missing: {missing}"
+
+
+@pytest.mark.parametrize("theme", _theme_names())
+def test_theme_styles_every_callout_type(theme):
+    css = _theme_css(theme)
+    for kind in ("deepdive", "interview", "workhelp", "note", "tip"):
+        assert f".admonition.{kind}" in css, f"{theme}.css does not style {kind}"
+
+
+@pytest.mark.parametrize("theme", _theme_names())
+def test_theme_renders_a_real_pdf(theme, tmp_path):
+    """Each theme must actually produce a PDF with a working running header."""
+    md = ("# Chapter One\n\n" + ("Body text. " * 300)
+          + "\n\n## A section\n\n"
+          + "| a | b |\n|---|---|\n| 1 | 2 |\n\n"
+          + "```python\nx = 1\n```\n\n"
+          + '!!! note "Heads up"\n    Something worth knowing.\n\n'
+          + "> A quotation.\n\n" + ("More body. " * 300))
+    html = document.assemble([(Path("a.md"), md)], title="T",
+                             renderer=_NullRenderer(), toc=True, cover=True,
+                             figure_list=False)
+    from biblion.cli import THEME_DIR
+    try:
+        from weasyprint import HTML
+    except Exception as exc:  # noqa: BLE001
+        pytest.skip(f"weasyprint unavailable: {exc}")
+    out = tmp_path / f"{theme}.pdf"
+    HTML(string=html).write_pdf(str(out), stylesheets=[str(THEME_DIR / f"{theme}.css")])
+    doc = pytest.importorskip("fitz").open(str(out))
+    assert doc.page_count >= 3
+    assert any("Chapter One" in b for b in _header_bands(doc)[1:]), \
+        f"{theme}: no running header"
+
+
+def test_unknown_theme_lists_the_available_ones():
+    from biblion.cli import theme_path
+    with pytest.raises(SystemExit) as excinfo:
+        theme_path("definitely-not-a-theme")
+    message = str(excinfo.value)
+    for name in _theme_names():
+        assert name in message

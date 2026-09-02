@@ -19,6 +19,7 @@ import fitz
 ROOT = Path(__file__).resolve().parent.parent
 EXAMPLE = ROOT / "examples" / "diagram-tour"
 PDF = EXAMPLE / "output" / "DiagramTour.pdf"
+REPORT_PDF = EXAMPLE / "output" / "DiagramTour_report.pdf"
 IMAGES = ROOT / "docs" / "images"
 
 # Page index (0-based) -> file name. Kept explicit rather than guessed, so a
@@ -32,17 +33,29 @@ PAGES = {
     4: "d2-containment",
 }
 
+# One page per theme, so the README can show what the choice actually means.
+THEME_PAGES = {"textbook": 3, "report": 3}
+
 DPI = 110
+
+
+def _build(*extra: str) -> int:
+    return subprocess.run(
+        [sys.executable, "-m", "biblion", "build", str(EXAMPLE), "--strict",
+         *extra], cwd=ROOT).returncode
 
 
 def main() -> int:
     print(f"Building {EXAMPLE.name} ...")
-    result = subprocess.run(
-        [sys.executable, "-m", "biblion", "build", str(EXAMPLE), "--strict"],
-        cwd=ROOT)
-    if result.returncode != 0:
+    if (rc := _build()) != 0:
         print("Build failed; not regenerating screenshots.", file=sys.stderr)
-        return result.returncode
+        return rc
+
+    print("Building it again with the report theme ...")
+    if (rc := _build("--theme", "report",
+                     "--output", "output/DiagramTour_report.pdf")) != 0:
+        print("Report-theme build failed.", file=sys.stderr)
+        return rc
 
     IMAGES.mkdir(parents=True, exist_ok=True)
     book = fitz.open(PDF)
@@ -56,6 +69,15 @@ def main() -> int:
         target = IMAGES / f"{name}.png"
         book[index].get_pixmap(dpi=DPI).save(str(target))
         print(f"  wrote {target.relative_to(ROOT)}")
+
+    # A same-page comparison of the two themes.
+    for theme, index in THEME_PAGES.items():
+        source = PDF if theme == "textbook" else REPORT_PDF
+        doc = fitz.open(source)
+        if index < doc.page_count:
+            target = IMAGES / f"theme-{theme}.png"
+            doc[index].get_pixmap(dpi=DPI).save(str(target))
+            print(f"  wrote {target.relative_to(ROOT)}")
     return 0
 
 

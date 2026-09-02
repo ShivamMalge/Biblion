@@ -21,6 +21,7 @@ locally, and for free on every run.
 - [Quickstart](#quickstart)
 - [Writing the markdown](#writing-the-markdown)
 - [Diagrams](#diagrams)
+- [Themes](#themes)
 - [Configuration](#configuration)
 - [Command reference](#command-reference)
 - [Using Biblion with an AI](#using-biblion-with-an-ai)
@@ -28,6 +29,7 @@ locally, and for free on every run.
 - [Environment variables](#environment-variables)
 - [Troubleshooting](#troubleshooting)
 - [Development](#development)
+- [License](#license)
 
 ---
 
@@ -221,6 +223,37 @@ lists it on a **Figures** page with a real page number.
 
 Uncaptioned diagrams are left alone: not numbered, not listed. If a book has
 no captions at all, no Figures page is generated.
+
+## Themes
+
+Two ship with Biblion. Pick one with `--theme NAME` or `theme = "..."` in
+`book.toml`.
+
+| Theme | For | Looks like |
+|---|---|---|
+| `textbook` *(default)* | course notes, study material, tutorials | Serif body, generous margins, navy cover panel, dark code blocks |
+| `report` | API docs, specifications, technical reports | Sans body, tight margins, flat typographic title page, light bordered code blocks |
+
+`report` fits roughly 20% more on a page — the same book renders in 91 pages
+instead of 113 — which suits something consulted rather than read straight
+through.
+
+```bash
+biblion build --theme report
+```
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ShivamMalge/Biblion/main/docs/images/theme-textbook.png" width="45%" alt="The same page in the textbook theme">
+  <img src="https://raw.githubusercontent.com/ShivamMalge/Biblion/main/docs/images/theme-report.png" width="45%" alt="The same page in the report theme">
+</p>
+
+<p align="center"><em>The same page, same markdown: <code>textbook</code> on
+the left, <code>report</code> on the right.</em></p>
+
+Point `--css path/to/your.css` at your own stylesheet to replace the theme
+entirely. Start by copying one of the shipped themes; `biblion doctor` will
+not check a custom stylesheet for you, and the generated HTML expects the
+classes both themes style.
 
 ## Configuration
 
