@@ -527,3 +527,47 @@ def test_unknown_theme_lists_the_available_ones():
     message = str(excinfo.value)
     for name in _theme_names():
         assert name in message
+
+
+# --- config errors ---------------------------------------------------------
+#
+# A typo in book.toml is user error. It must produce one clear line, never a
+# Python traceback.
+
+def _write_config(tmp_path, body):
+    (tmp_path / "book.toml").write_text(body, encoding="utf-8")
+    return tmp_path
+
+
+def test_malformed_toml_is_a_clean_error(tmp_path):
+    _write_config(tmp_path, 'title = "unterminated\n')
+    with pytest.raises(config.ConfigError) as excinfo:
+        config.BookConfig.load(tmp_path)
+    assert "not valid TOML" in str(excinfo.value)
+
+
+def test_wrong_type_names_the_setting_and_the_expected_type(tmp_path):
+    _write_config(tmp_path, 'title = "T"\ntoc_depth = "three"\n')
+    with pytest.raises(config.ConfigError) as excinfo:
+        config.BookConfig.load(tmp_path)
+    message = str(excinfo.value)
+    assert "toc_depth" in message
+    assert "whole number" in message
+
+
+def test_wrong_bool_type_is_rejected(tmp_path):
+    _write_config(tmp_path, 'title = "T"\ntoc = "yes"\n')
+    with pytest.raises(config.ConfigError) as excinfo:
+        config.BookConfig.load(tmp_path)
+    assert "true or false" in str(excinfo.value)
+
+
+def test_correct_types_are_accepted(tmp_path):
+    _write_config(tmp_path, 'title = "T"\ntoc_depth = 2\ntoc = false\n')
+    loaded = config.BookConfig.load(tmp_path)
+    assert loaded.toc_depth == 2 and loaded.toc is False
+
+
+def test_config_error_is_a_value_error():
+    """Subclassing ValueError keeps older callers working."""
+    assert issubclass(config.ConfigError, ValueError)

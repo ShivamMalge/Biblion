@@ -29,6 +29,7 @@ locally, and for free on every run.
 - [Environment variables](#environment-variables)
 - [Troubleshooting](#troubleshooting)
 - [Development](#development)
+- [Changelog](#changelog)
 - [License](#license)
 
 ---
@@ -476,6 +477,10 @@ CI runs the unit tests on Linux, macOS and Windows, and builds
 broken renderer fails the build rather than shipping a book full of red boxes.
 The example is not built on Windows in CI because WeasyPrint there needs the
 GTK3 runtime, which has no clean unattended installer.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

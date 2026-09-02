@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 from . import __version__, document, tools
-from .config import CONFIG_NAME, TEMPLATE, BookConfig
+from .config import CONFIG_NAME, TEMPLATE, BookConfig, ConfigError
 from .diagrams import DiagramRenderer
 
 PACKAGE_DIR = Path(__file__).parent
@@ -391,7 +391,12 @@ def main(argv: list[str] | None = None) -> int:
     if not getattr(args, "func", None):
         parser.print_help()
         return 1
-    return args.func(args)
+    try:
+        return args.func(args)
+    except ConfigError as exc:
+        # A broken book.toml is user error, not a crash. One clear message.
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":

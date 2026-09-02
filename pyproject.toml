@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 # Django blog app last released in 2015. Only this string changes -- the
 # import package, the CLI command and everything else stay "biblion".
 name = "biblion-pdf"
-version = "0.2.0"
+version = "0.3.0"
 description = "Turn plain markdown into a typeset PDF book, with real diagrams, locally and for free."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -42,6 +42,7 @@ biblion = "biblion.cli:main"
 [project.urls]
 Homepage = "https://github.com/ShivamMalge/Biblion"
 Issues = "https://github.com/ShivamMalge/Biblion/issues"
+Changelog = "https://github.com/ShivamMalge/Biblion/blob/main/CHANGELOG.md"
 
 [tool.setuptools]
 packages = ["biblion"]

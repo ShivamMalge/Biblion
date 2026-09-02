@@ -6,4 +6,4 @@ and Biblion does all the layout, typography, pagination and diagram
 rendering locally, for free, on every subsequent run.
 """
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"

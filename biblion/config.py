@@ -15,6 +15,16 @@ from pathlib import Path
 CONFIG_NAME = "book.toml"
 
 
+class ConfigError(ValueError):
+    """A book.toml that cannot be used.
+
+    Raised instead of letting tomllib's TOMLDecodeError escape, so a typo in a
+    config file prints one clear line rather than a Python traceback. Subclasses
+    ValueError because that is what a bad setting is, and so code that already
+    catches ValueError keeps working.
+    """
+
+
 @dataclass
 class BookConfig:
     # content
@@ -57,8 +67,13 @@ class BookConfig:
         if not path.is_file():
             return cls()
 
-        with path.open("rb") as handle:
-            data = tomllib.load(handle)
+        try:
+            with path.open("rb") as handle:
+                data = tomllib.load(handle)
+        except tomllib.TOMLDecodeError as exc:
+            raise ConfigError(f"{path} is not valid TOML: {exc}") from exc
+        except OSError as exc:
+            raise ConfigError(f"Could not read {path}: {exc}") from exc
 
         # Accept both a flat table and a [book] section, since both read
         # naturally and guessing wrong shouldn't be a hard error.
@@ -72,13 +87,48 @@ class BookConfig:
         known = {f.name for f in fields(cls)} - {"_source"}
         unknown = set(merged) - known
         if unknown:
-            raise ValueError(
-                f"{path}: unknown setting(s): {', '.join(sorted(unknown))}. "
+            raise ConfigError(
+                f"{path}: unknown setting(s): {', '.join(sorted(unknown))}.\n"
                 f"Known settings: {', '.join(sorted(known))}")
 
-        config = cls(**{k: v for k, v in merged.items() if k in known})
+        cls._check_types(path, merged)
+
+        try:
+            config = cls(**{k: v for k, v in merged.items() if k in known})
+        except TypeError as exc:
+            raise ConfigError(f"{path}: {exc}") from exc
         config._source = path
         return config
+
+    # Human names for the types a setting can have, for error messages.
+    _TYPE_NAMES = {"str": "text in quotes", "int": "a whole number",
+                   "bool": "true or false"}
+
+    @classmethod
+    def _check_types(cls, path: Path, merged: dict) -> None:
+        """Reject a setting of the wrong type at load time.
+
+        Without this, `toc_depth = "three"` sails through the dataclass and
+        fails much later with a TypeError from deep inside the page-numbering
+        code, which tells the user nothing about their config file.
+        """
+        # `from __future__ import annotations` means f.type is the string name.
+        expected = {"str": str, "int": int, "bool": bool}
+        for f in fields(cls):
+            if f.name not in merged:
+                continue
+            want = expected.get(str(f.type))
+            if want is None:
+                continue
+            value = merged[f.name]
+            # bool is a subclass of int, so check it explicitly both ways.
+            ok = (isinstance(value, bool) if want is bool
+                  else isinstance(value, want) and not isinstance(value, bool))
+            if not ok:
+                raise ConfigError(
+                    f"{path}: {f.name!r} must be "
+                    f"{cls._TYPE_NAMES[str(f.type)]}, "
+                    f"but got {value!r}")
 
     def merge_cli(self, args) -> "BookConfig":
         """Overlay any explicitly-passed CLI arguments on top of this config."""
